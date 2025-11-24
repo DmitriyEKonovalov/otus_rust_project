@@ -5,27 +5,18 @@ use axum::{
     response::IntoResponse,
     Json, Router,
 };
-use redis::{Commands, Connection, RedisResult};
+use chrono::Utc;
+use common::calc_info::CalcInfo;
+use common::redis::{get_calc_info, not_found_error, set_calc_info, set_result, AppState, RedisDataError};
 use serde::{Deserialize, Serialize};
-use std::{
-    sync::Arc,
-    thread,
-    time::Duration,
-};
+use std::{sync::Arc, thread};
+use tokio::net::TcpListener;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
+
+mod calcs;
+use calcs::{base_calc::base_calc, mass_calc::mass_calc};
 
 // === Структуры данных ===
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CalcInfo {
-    pub calc_id: Uuid,
-    pub run_dt: DateTime<Utc>,
-    pub end_dt: Option<DateTime<Utc>>,
-    pub params: Option<serde_json::Value>,
-    pub progress: u32, // 0..100
-    pub result: Option<serde_json::Value>,
-}
 
 #[derive(Debug, Deserialize)]
 pub struct CalcRequest {
@@ -44,20 +35,24 @@ pub struct ErrorResponse {
 }
 
 // === Ошибки ===
-
 #[derive(Debug, thiserror::Error)]
 enum ApiError {
+    #[error(transparent)]
+    Redis(#[from] RedisDataError),
     #[error("Redis error: {0}")]
-    Redis(#[from] redis::RedisError),
-    #[error("JSON error: {0}")]
+    RedisClient(#[from] redis::RedisError),
+    #[error("Bad params: {0}")]
+    BadParams(String),
+    #[error("Invalid JSON: {0}")]
     Json(#[from] serde_json::Error),
 }
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
         let status = match self {
-            ApiError::Redis(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ApiError::BadParams(_) => StatusCode::BAD_REQUEST,
             ApiError::Json(_) => StatusCode::BAD_REQUEST,
+            ApiError::Redis(_) | ApiError::RedisClient(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         let body = Json(ErrorResponse {
             error: self.to_string(),
@@ -66,105 +61,39 @@ impl IntoResponse for ApiError {
     }
 }
 
-// === Состояние сервера ===
 
-#[derive(Clone)]
-struct AppState {
-    redis_client: Arc<redis::Client>,
-}
-
-// === Вспомогательные функции Redis ===
-
-fn get_calc_info(conn: &mut Connection, calc_id: Uuid) -> RedisResult<Option<CalcInfo>> {
-    let key = format!("calc:{}", calc_id);
-    let json: Option<String> = conn.get(&key)?;
-    match json {
-        Some(s) => {
-            let info = serde_json::from_str(&s)?;
-            Ok(Some(info))
-        }
-        None => Ok(None),
-    }
-}
-
-fn set_calc_info(conn: &mut Connection, calc_id: Uuid, info: &CalcInfo) -> RedisResult<()> {
-    let key = format!("calc:{}", calc_id);
-    let json = serde_json::to_string(info)?;
-    // TTL = 1 час
-    conn.set_ex(&key, &json, 3600)?;
-    Ok(())
-}
-
-fn update_progress(
-    conn: &mut Connection,
+fn spawn_calc(
     calc_id: Uuid,
-    progress: u32,
-) -> RedisResult<()> {
-    let mut info = get_calc_info(conn, calc_id)?
-        .ok_or_else(|| redis::RedisError::from((redis::ErrorKind::NotFound, "Task not found")))?;
-
-    info.progress = progress;
-    set_calc_info(conn, calc_id, &info)
-}
-
-fn set_result(
-    conn: &mut Connection,
-    calc_id: Uuid,
-    result: serde_json::Value,
-) -> RedisResult<()> {
-    let mut info = get_calc_info(conn, calc_id)?
-        .ok_or_else(|| redis::RedisError::from((redis::ErrorKind::NotFound, "Task not found")))?;
-
-    info.end_dt = Some(Utc::now());
-    info.result = Some(result);
-    info.progress = 100;
-    set_calc_info(conn, calc_id, &info)
-}
-
-// === Функция расчёта (пример) ===
-
-/// Тип функции расчёта: принимает параметры и доступ к Redis
-type CalcFn = Box<dyn FnOnce(Uuid, &mut Connection, Option<serde_json::Value>) + Send>;
-
-fn example_calculation(
-    calc_id: Uuid,
-    conn: &mut Connection,
     params: Option<serde_json::Value>,
-) -> Result<(), ApiError> {
-    // Имитация долгой работы: 100 шагов
-    for step in 0..=100 {
-        thread::sleep(Duration::from_millis(30));
-
-        // Обновляем прогресс в Redis
-        update_progress(conn, calc_id, step)?;
-
-        // Можно добавить early stop: если progress == 0 → отмена
-    }
-
-    // Формируем результат
-    let result_value = serde_json::json!({
-        "input_params": params,
-        "status": "completed",
-        "result_value": 42.0,
-        "steps_done": 100
+    client: Arc<redis::Client>,
+    calc_fn: fn(Uuid, &mut redis::Connection, Option<serde_json::Value>) -> Result<(), ApiError>,
+) {
+    thread::spawn(move || {
+        match client.get_connection() {
+            Ok(mut conn) => {
+                if let Err(e) = calc_fn(calc_id, &mut conn, params) {
+                    eprintln!("? Calculation failed for {}: {}", calc_id, e);
+                    let _ = set_result(&mut conn, calc_id, serde_json::json!({
+                        "error": e.to_string()
+                    }));
+                }
+            }
+            Err(e) => {
+                eprintln!("? Failed to get Redis connection in worker: {}", e);
+            }
+        }
     });
-
-    // Сохраняем результат
-    set_result(conn, calc_id, result_value)?;
-
-    Ok(())
 }
 
-// === Handler: создание расчёта ===
+// === Handler: запуск base_calc ===
 
-async fn submit_calculation(
+async fn run_base_calc(
     State(state): State<AppState>,
     Json(payload): Json<CalcRequest>,
 ) -> Result<Json<SubmitResponse>, ApiError> {
     let calc_id = Uuid::new_v4();
     let now = Utc::now();
 
-    // Создаём начальную запись
     let initial_info = CalcInfo {
         calc_id,
         run_dt: now,
@@ -174,59 +103,95 @@ async fn submit_calculation(
         result: None,
     };
 
-    // Сохраняем в Redis
     let mut conn = state.redis_client.get_connection()?;
     set_calc_info(&mut conn, calc_id, &initial_info)?;
 
-    // === Запуск расчёта в отдельном потоке ===
     let client_clone = Arc::clone(&state.redis_client);
     let params_clone = payload.params.clone();
-
-    // Запускаем блокирующий расчёт в std::thread
-    thread::spawn(move || {
-        match client_clone.get_connection() {
-            Ok(mut conn) => {
-                if let Err(e) = example_calculation(calc_id, &mut conn, params_clone) {
-                    eprintln!("❌ Calculation failed for {}: {}", calc_id, e);
-                    // Можно записать ошибку в Redis:
-                    let _ = set_result(&mut conn, calc_id, serde_json::json!({
-                        "error": e.to_string()
-                    }));
-                }
-            }
-            Err(e) => {
-                eprintln!("❌ Failed to get Redis connection in worker: {}", e);
-            }
-        }
-    });
+    spawn_calc(calc_id, params_clone, client_clone, base_calc);
 
     Ok(Json(SubmitResponse { calc_id }))
 }
 
-// === Handler: получение статуса ===
+// === Handler: запуск mass_calc ===
 
+async fn run_mass_calc(
+    State(state): State<AppState>,
+    Json(payload): Json<CalcRequest>,
+) -> Result<Json<SubmitResponse>, ApiError> {
+    let calc_id = Uuid::new_v4();
+    let now = Utc::now();
+
+    let initial_info = CalcInfo {
+        calc_id,
+        run_dt: now,
+        end_dt: None,
+        params: payload.params.clone(),
+        progress: 0,
+        result: None,
+    };
+
+    let mut conn = state.redis_client.get_connection()?;
+    set_calc_info(&mut conn, calc_id, &initial_info)?;
+
+    let client_clone = Arc::clone(&state.redis_client);
+    let params_clone = payload.params.clone();
+    spawn_calc(calc_id, params_clone, client_clone, mass_calc);
+
+    Ok(Json(SubmitResponse { calc_id }))
+}
+
+#[derive(Debug, Serialize)]
+struct StatusResponse {
+    run_dt: chrono::DateTime<chrono::Utc>,
+    progress: u32,
+}
+
+
+// === Handler: ????????? ??????? ===
 async fn get_calculation_status(
     State(state): State<AppState>,
     Path(calc_id): Path<Uuid>,
-) -> Result<Json<CalcInfo>, ApiError> {
+) -> Result<Json<StatusResponse>, ApiError> {
     let mut conn = state.redis_client.get_connection()?;
     let info = get_calc_info(&mut conn, calc_id)?
-        .ok_or_else(|| redis::RedisError::from((redis::ErrorKind::NotFound, "Task not found")))?;
+        .ok_or_else(not_found_error)?;
 
-    Ok(Json(info))
+    Ok(Json(StatusResponse {
+        run_dt: info.run_dt,
+        progress: info.progress,
+    }))
 }
 
-// === Запуск сервера ===
+#[derive(Debug, Serialize)]
+struct ResultResponse {
+    calc_id: Uuid,
+    end_dt: Option<chrono::DateTime<chrono::Utc>>,
+    result: Option<serde_json::Value>,
+}
 
+async fn get_calculation_result(
+    State(state): State<AppState>,
+    Path(calc_id): Path<Uuid>,
+) -> Result<Json<ResultResponse>, ApiError> {
+    let mut conn = state.redis_client.get_connection()?;
+    let info = get_calc_info(&mut conn, calc_id)?
+        .ok_or_else(not_found_error)?;
+
+    Ok(Json(ResultResponse {
+        calc_id: info.calc_id,
+        end_dt: info.end_dt,
+        result: info.result,
+    }))
+}
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Подключение к Redis (по умолчанию — localhost:6379)
     let redis_client = redis::Client::open("redis://127.0.0.1/").expect("Invalid Redis URL");
     
     // Проверка подключения
-    let _: String = redis_client
-        .get_connection()?
-        .ping()?;
+    let mut ping_conn = redis_client.get_connection()?;
+    let _: String = redis::cmd("PING").query(&mut ping_conn)?;
 
     println!("✅ Connected to Redis");
 
@@ -235,14 +200,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let app = Router::new()
-        .route("/calc", post(submit_calculation))
-        .route("/calc/:id", get(get_calculation_status))
+        .route("/api/calc/base_calc", post(run_base_calc))
+        .route("/api/calc/mass_calc", post(run_mass_calc))
+        .route("/api/calc/:id", get(get_calculation_status))
+        .route("/api/calc/result/:id", get(get_calculation_result))
         .with_state(app_state);
 
-    println!("🚀 Server running on http://0.0.0.0:3000");
-    axum::Server::bind(&"0.0.0.0:3000".parse()?)
-        .serve(app.into_make_service())
-        .await?;
+    let listener = TcpListener::bind("0.0.0.0:3000").await?;
+    println!("🚀 Server running on http://{}", listener.local_addr()?);
+    axum::serve(listener, app).await?;
 
     Ok(())
 }
