@@ -11,6 +11,8 @@ pub enum RedisDataError {
     Redis(#[from] redis::RedisError),
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("Task not found")]
+    NotFound,
 }
 
 pub type RedisResult<T> = Result<T, RedisDataError>;
@@ -24,16 +26,15 @@ fn task_not_found() -> redis::RedisError {
     redis::RedisError::from((ErrorKind::ResponseError, "Task not found"))
 }
 
-pub fn get_calc_info(conn: &mut Connection, calc_id: Uuid) -> RedisResult<Option<CalcInfo>> {
+pub fn get_calc_info(conn: &mut Connection, calc_id: Uuid) -> RedisResult<CalcInfo> {
     let key = format!("calc:{}", calc_id);
     let json: Option<String> = conn.get(&key)?;
-    match json {
-        Some(s) => {
-            let info = serde_json::from_str(&s)?;
-            Ok(Some(info))
-        }
-        None => Ok(None),
-    }
+    let Some(s) = json else {
+        return Err(RedisDataError::NotFound);
+    };
+
+    let info = serde_json::from_str(&s)?;
+    Ok(info)
 }
 
 pub fn set_calc_info(conn: &mut Connection, calc_id: Uuid, info: &CalcInfo) -> RedisResult<()> {
@@ -45,8 +46,7 @@ pub fn set_calc_info(conn: &mut Connection, calc_id: Uuid, info: &CalcInfo) -> R
 }
 
 pub fn update_progress(conn: &mut Connection, calc_id: Uuid, progress: u32) -> RedisResult<()> {
-    let mut info = get_calc_info(conn, calc_id)?
-        .ok_or_else(task_not_found)?;
+    let mut info = get_calc_info(conn, calc_id)?;
 
     info.progress = progress;
     set_calc_info(conn, calc_id, &info)
@@ -57,15 +57,10 @@ pub fn set_result(
     calc_id: Uuid,
     result: serde_json::Value,
 ) -> RedisResult<()> {
-    let mut info = get_calc_info(conn, calc_id)?
-        .ok_or_else(task_not_found)?;
+    let mut info = get_calc_info(conn, calc_id)?;
 
     info.end_dt = Some(Utc::now());
     info.result = Some(result);
     info.progress = 100;
     set_calc_info(conn, calc_id, &info)
-}
-
-pub fn not_found_error() -> redis::RedisError {
-    task_not_found()
 }

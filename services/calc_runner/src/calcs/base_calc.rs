@@ -1,4 +1,4 @@
-use crate::ApiError;
+use crate::api::errors::ApiError;
 use common::redis::{set_result, update_progress};
 use rand::Rng;
 use redis::Connection;
@@ -8,7 +8,7 @@ use std::time::Duration;
 use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
-struct BaseParams {
+struct RunBaseCalcRequest {
     iterations: u32,
 }
 
