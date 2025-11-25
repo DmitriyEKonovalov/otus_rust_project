@@ -2,16 +2,16 @@ use crate::api::errors::ApiError;
 use common::redis::{set_result, update_progress};
 use rand::Rng;
 use redis::Connection;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::thread::sleep;
 use std::time::Duration;
 use uuid::Uuid;
 
-#[derive(Debug, Deserialize)]
-struct MassParams {
-    data: Vec<u32>,
-    iterations: u32,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MassCalcParams {
+    pub data: Vec<u32>,
+    pub iterations: u32,
 }
 
 pub fn mass_calc(
@@ -19,7 +19,7 @@ pub fn mass_calc(
     conn: &mut Connection,
     params: Option<serde_json::Value>,
 ) -> Result<(), ApiError> {
-    let params: MassParams = params
+    let params: MassCalcParams = params
         .map(serde_json::from_value)
         .transpose()?
         .ok_or_else(|| ApiError::BadParams("data and iterations are required".into()))?;

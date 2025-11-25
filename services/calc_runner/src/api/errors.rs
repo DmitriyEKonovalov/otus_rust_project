@@ -19,6 +19,8 @@ pub enum ApiError {
     Json(#[from] serde_json::Error),
     #[error("Not found")]
     NotFound,
+    #[error("Calculation not completed: {0}")]
+    CalculationNotCompleted(uuid::Uuid),
 }
 
 impl IntoResponse for ApiError {
@@ -28,6 +30,7 @@ impl IntoResponse for ApiError {
             ApiError::Json(_) => StatusCode::BAD_REQUEST,
             ApiError::Redis(_) | ApiError::RedisClient(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ApiError::NotFound => StatusCode::NOT_FOUND,
+            ApiError::CalculationNotCompleted(_) => StatusCode::BAD_REQUEST,
         };
         let body = Json(ErrorResponse {
             error: self.to_string(),

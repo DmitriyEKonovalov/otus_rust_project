@@ -2,14 +2,14 @@ use crate::api::errors::ApiError;
 use common::redis::{set_result, update_progress};
 use rand::Rng;
 use redis::Connection;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::thread::sleep;
 use std::time::Duration;
 use uuid::Uuid;
 
-#[derive(Debug, Deserialize)]
-struct RunBaseCalcRequest {
-    iterations: u32,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BaseCalcParams {
+    pub iterations: u32,
 }
 
 pub fn base_calc(
@@ -17,7 +17,7 @@ pub fn base_calc(
     conn: &mut Connection,
     params: Option<serde_json::Value>,
 ) -> Result<(), ApiError> {
-    let params: BaseParams = params
+    let params: BaseCalcParams = params
         .map(serde_json::from_value)
         .transpose()?
         .ok_or_else(|| ApiError::BadParams("iterations are required".into()))?;

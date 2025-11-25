@@ -19,13 +19,16 @@ pub struct GetCalcStatusResponse {
     pub duration: i64,
 }
 
-pub async fn get_calculation_status(
+//
+// Обработчик запросов на получение статуса расчета
+//
+pub async fn get_calc_status(
     State(state): State<AppState>,
     Path(calc_id): Path<Uuid>,
 ) -> Result<Json<GetCalcStatusResponse>, ApiError> {
     let mut conn = state.redis_client.get_connection()?;
-    let info = get_calc_info(&mut conn, calc_id)?;
-    let CalcInfo { run_dt, progress, .. } = info;
+    let calc_info = get_calc_info(&mut conn, calc_id)?;
+    let CalcInfo { run_dt, progress, .. } = calc_info;
     let duration = (Utc::now() - run_dt).num_seconds();
 
     Ok(Json(GetCalcStatusResponse {

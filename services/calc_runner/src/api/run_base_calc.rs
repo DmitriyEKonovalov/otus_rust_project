@@ -6,29 +6,29 @@ use common::{
     calc_info::CalcInfo,
     redis::{set_calc_info, AppState},
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::{
-    api::{errors::ApiError, spawn_calc},
-    calcs::base_calc::base_calc,
+    api::errors::ApiError,
+    calcs::base_calc::{base_calc, BaseCalcParams},
+    utils::spawn_calc,
 };
 
-#[derive(Debug, Deserialize)]
-pub struct RunCalcRequest {
-    #[serde(default)]
-    pub params: Option<serde_json::Value>,
-}
+
 
 #[derive(Debug, Serialize)]
-pub struct RunCalcResponse {
+pub struct RunBaseCalcResponse {
     pub calc_id: Uuid,
 }
 
+//
+// Обработчик запуска base_calc расчета
+//
 pub async fn run_base_calc(
     State(state): State<AppState>,
-    Json(payload): Json<RunCalcRequest>,
-) -> Result<Json<RunCalcResponse>, ApiError> {
+    Json(params): Json<BaseCalcParams>,
+) -> Result<Json<RunBaseCalcResponse>, ApiError> {
     let calc_id = Uuid::new_v4();
     let now = Utc::now();
 
@@ -36,7 +36,7 @@ pub async fn run_base_calc(
         calc_id,
         run_dt: now,
         end_dt: None,
-        params: payload.params.clone(),
+        params: Some(serde_json::to_value(&params)?),
         progress: 0,
         result: None,
     };
@@ -45,8 +45,8 @@ pub async fn run_base_calc(
     set_calc_info(&mut conn, calc_id, &initial_info)?;
 
     let client_clone = Arc::clone(&state.redis_client);
-    let params_clone = payload.params.clone();
+    let params_clone = Some(serde_json::to_value(&params)?);
     spawn_calc(calc_id, params_clone, client_clone, base_calc);
 
-    Ok(Json(RunCalcResponse { calc_id }))
+    Ok(Json(RunBaseCalcResponse { calc_id }))
 }
