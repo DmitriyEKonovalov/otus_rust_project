@@ -1,3 +1,7 @@
+//
+// Обработчик запросов на получение результатов расечта
+//
+
 use axum::{
     extract::{Path, State},
     Json,
@@ -23,29 +27,16 @@ pub struct GetCalcResultResponse {
     pub duration: i64,
 }
 
-pub async fn get_calculation_result(
+pub async fn get_calc_result(
     State(state): State<AppState>,
     Path(calc_id): Path<Uuid>,
 ) -> Result<Json<GetCalcResultResponse>, ApiError> {
     let mut conn = state.redis_client.get_connection()?;
-    let info = get_calc_info(&mut conn, calc_id)?;
-    let CalcInfo {
-        calc_id,
-        run_dt,
-        end_dt,
-        params,
-        progress,
-        result,
-    } = info;
-    let duration = (Utc::now() - run_dt).num_seconds();
+    let calc_info = get_calc_info(&mut conn, calc_id)?.ok_or_else(not_found_error)?;
 
     Ok(Json(GetCalcResultResponse {
-        calc_id,
-        run_dt,
-        end_dt,
-        params,
-        progress,
-        result,
-        duration,
+        calc_id: calc_info.calc_id,
+        end_dt: calc_info.end_dt,
+        result: calc_info.result,
     }))
 }
