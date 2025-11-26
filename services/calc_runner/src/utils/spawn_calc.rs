@@ -5,11 +5,14 @@ use uuid::Uuid;
 
 use crate::api::errors::ApiError;
 
+// Вспомогательная функция для запуска расчета в отдельном потоке, 
+// который запускается в хэндлере, но продолжает работать после выхода из него.   
+// Принимает id расчета, функцию, параметры к ней и клиент Redis  
 pub fn spawn_calc(
     calc_id: Uuid,
+    calc_fn: fn(Uuid, &mut redis::Connection, Option<serde_json::Value>) -> Result<(), ApiError>,
     params: Option<serde_json::Value>,
     client: Arc<redis::Client>,
-    calc_fn: fn(Uuid, &mut redis::Connection, Option<serde_json::Value>) -> Result<(), ApiError>,
 ) {
     thread::spawn(move || match client.get_connection() {
         Ok(mut conn) => {

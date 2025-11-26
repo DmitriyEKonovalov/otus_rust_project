@@ -2,11 +2,13 @@ use axum::{http::StatusCode, response::IntoResponse, Json};
 use common::redis::RedisDataError;
 use serde::Serialize;
 
+// структура для сообщения об ошибке
 #[derive(Debug, Serialize)]
 pub struct ErrorResponse {
     pub error: String,
 }
 
+// перечисление специфичных ошибок API
 #[derive(Debug, thiserror::Error)]
 pub enum ApiError {
     #[error(transparent)]

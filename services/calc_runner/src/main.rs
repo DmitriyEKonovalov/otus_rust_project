@@ -5,7 +5,7 @@ mod utils;
 use std::sync::Arc;
 
 use axum::{
-    routing::{get, post},
+    routing::{post},
     Router,
 };
 use common::redis::AppState;

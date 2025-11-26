@@ -7,6 +7,16 @@ use std::thread::sleep;
 use std::time::Duration;
 use uuid::Uuid;
 
+//
+// Простая функция (base_calc), имитирующая тяжелый расчет, запускаемая в отдельном потоке. 
+// - получет кол-во итераций n
+// - создает последовательность n чисел -100..100, с интервалом в 10 сек 
+// - возвращает (записывает в redis) в поле с результатом json вида 
+// { 
+//     "simulations": [10, 20, 55, -3 ...] 
+// } 
+
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BaseCalcParams {
     pub iterations: u32,

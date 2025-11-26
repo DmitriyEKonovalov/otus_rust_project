@@ -8,6 +8,19 @@ use std::thread::sleep;
 use std::time::Duration;
 use uuid::Uuid;
 
+//
+// Более сложная функция (mass_calc), имитирующая тяжелый расчет, запускаемая в отдельном потоке. 
+// - получет последовательность чисел data и кол-во итераций n
+// - для каждого data[i] создает n чисел rand(0..data[i]), с интервалом в 10 сек 
+// - возвращает (записывает в redis) в поле с результатом json вида 
+// { 
+//     "simulations": [
+//         [10, 55, -3, ...],
+//         [-5, 5, 0, ...],
+//         ... 
+//     ] 
+// } 
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MassCalcParams {
     pub data: Vec<u32>,
@@ -34,18 +47,20 @@ pub fn mass_calc(
     let mut rng = rand::thread_rng();
     let mut simulations: HashMap<String, Vec<u32>> = HashMap::new();
 
-    for &n in &params.data {
-        let progress = ((n as u64 * 100) / params.data.len() as u64).min(100) as u32;
+    for (i, &n) in params.data.iter().enumerate() {
         let mut series = Vec::with_capacity(params.iterations as usize);
 
         for _ in 0..params.iterations {
             sleep(Duration::from_secs(5));
-            let value = rng.gen_range(0..=n);
+            let value = rng.gen_range(0..n);
             series.push(value);
-            update_progress(conn, calc_id, progress)?;
         }
 
         simulations.insert(n.to_string(), series);
+
+        // обновить progress
+        let progress = ((i + 1) * 100) / params.data.len();
+        update_progress(conn, calc_id, progress as u32)?;
     }
 
     set_result(

@@ -46,7 +46,7 @@ pub async fn run_base_calc(
 
     let client_clone = Arc::clone(&state.redis_client);
     let params_clone = Some(serde_json::to_value(&params)?);
-    spawn_calc(calc_id, params_clone, client_clone, base_calc);
+    spawn_calc(calc_id, base_calc, params_clone, client_clone);
 
     Ok(Json(RunBaseCalcResponse { calc_id }))
 }

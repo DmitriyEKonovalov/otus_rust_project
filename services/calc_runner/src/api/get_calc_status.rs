@@ -28,8 +28,16 @@ pub async fn get_calc_status(
 ) -> Result<Json<GetCalcStatusResponse>, ApiError> {
     let mut conn = state.redis_client.get_connection()?;
     let calc_info = get_calc_info(&mut conn, calc_id)?;
-    let CalcInfo { run_dt, progress, .. } = calc_info;
-    let duration = (Utc::now() - run_dt).num_seconds();
+    let CalcInfo { run_dt, progress, end_dt, .. } = calc_info;
+    
+    let duration: i64 = {
+        if end_dt.is_none() { 
+            (Utc::now() - run_dt).num_seconds() 
+        } else { 
+            (end_dt.unwrap() - run_dt).num_seconds()
+        }   
+    }; 
+    
 
     Ok(Json(GetCalcStatusResponse {
         run_dt,

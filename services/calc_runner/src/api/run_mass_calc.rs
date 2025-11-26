@@ -21,6 +21,9 @@ pub struct RunMassCalcResponse {
     pub calc_id: Uuid,
 }
 
+//
+// Обработчик запуска mass_calc расчета
+//
 pub async fn run_mass_calc(
     State(state): State<AppState>,
     Json(payload): Json<MassCalcParams>,
@@ -42,7 +45,7 @@ pub async fn run_mass_calc(
 
     let client_clone = Arc::clone(&state.redis_client);
     let params_clone = Some(serde_json::to_value(&payload)?);
-    spawn_calc(calc_id, params_clone, client_clone, mass_calc);
+    spawn_calc(calc_id, mass_calc, params_clone, client_clone);
 
     Ok(Json(RunMassCalcResponse { calc_id }))
 }
