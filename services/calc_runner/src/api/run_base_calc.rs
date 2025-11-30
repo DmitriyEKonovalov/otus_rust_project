@@ -1,19 +1,18 @@
-use std::sync::Arc;
-
 use axum::{extract::State, Json};
 use chrono::Utc;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use serde_json;
 use uuid::Uuid;
+use crate::app_state::AppState;
+use crate::models::CalcInfo;
+use crate::api::ApiError;
+use crate::calcs::spawn_calc;
+use crate::calcs::base_calc;
 
-use common::models::CalcInfo;
-use common::redis::AppState;
-use crate::{
-    api::errors::ApiError,
-    calcs::base_calc::{base_calc, BaseCalcParams},
-    utils::spawn_calc,
-};
-
-
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BaseCalcParams {
+    pub iterations: u32,
+}
 
 #[derive(Debug, Serialize)]
 pub struct RunBaseCalcResponse {
@@ -22,38 +21,28 @@ pub struct RunBaseCalcResponse {
 
 //
 // Обработчик запуска base_calc расчета
-//
 pub async fn run_base_calc(
     State(state): State<AppState>,
     Json(params): Json<BaseCalcParams>,
 ) -> Result<Json<RunBaseCalcResponse>, ApiError> {
-    let calc_id = Uuid::new_v4();
-    let now = Utc::now();
 
-    let initial_info = CalcInfo {
-        calc_id,
-        run_dt: now,
+    let calc_params: BaseCalcParams = params.clone();
+    if calc_params.iterations == 0 {
+        return Err(ApiError::BadParams("iterations must be > 0".into()));
+    }
+    // создаем новый расчет
+    let calc_id = Uuid::new_v4();
+    let calc_info = CalcInfo {
+        calc_id: calc_id,
+        run_dt: Utc::now(),
         end_dt: None,
-        params: Some(serde_json::to_value(&params)?),
+        params: Some(serde_json::to_value(&params).unwrap()),
         progress: 0,
         result: None,
     };
 
-    let mut conn = state.redis_client.get_multiplexed_async_connection().await?;
-    {
-        let this = initial_info;
-        let conn: &mut impl AsyncCommands = &mut conn;
-        async move {
-            let key: String = format!("{}{}", CALC_INFO_PREFIX, this.calc_id);
-            let json = serde_json::to_string(&this)?;
-            let _: () = conn.set_ex(key, json, CALC_INFO_TTL_SECONDS).await?;
-            Ok(())
-        }
-    }.await?;
+    // запустить отедльный поток с расчетом
+    spawn_calc(base_calc, calc_info, state.storage);
 
-    let client_clone = Arc::clone(&state.redis_client);
-    let params_clone = Some(serde_json::to_value(&params)?);
-    spawn_calc(calc_id, base_calc, params_clone, client_clone);
-
-    Ok(Json(RunBaseCalcResponse { calc_id }))
+    Ok(Json(RunBaseCalcResponse { calc_id: calc_id }))
 }

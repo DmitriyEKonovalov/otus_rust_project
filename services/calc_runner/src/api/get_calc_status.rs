@@ -3,11 +3,11 @@ use axum::{
     Json,
 };
 use chrono::Utc;
-use crate::state::AppState;
 use serde::Serialize;
 use uuid::Uuid;
-
-use crate::api::errors::ApiError;
+use crate::app_state::AppState;
+use crate::api::ApiError;
+use crate::models::{CalcInfo, CALC_INFO_PREFIX};
 
 #[derive(Debug, Serialize)]
 pub struct GetCalcStatusResponse {
@@ -18,22 +18,21 @@ pub struct GetCalcStatusResponse {
 
 //
 // Обработчик запросов на получение статуса расчета
-//
 pub async fn get_calc_status(
     State(state): State<AppState>,
     Path(calc_id): Path<Uuid>,
 ) -> Result<Json<GetCalcStatusResponse>, ApiError> {
-    let mut conn: redis::aio::MultiplexedConnection = state.redis_client.get_multiplexed_async_connection().await?;
-    let calc_info = CalcInfo::get(&mut conn, calc_id).await.map_err(ApiError::from)?;
+    let storage = state.storage.clone(); 
+    let key: String = format!("{}{}", CALC_INFO_PREFIX, calc_id);
+    let calc_info:CalcInfo = storage.get(&key).await.map_err(ApiError::from)?;
     
     let duration: i64 = {
         if calc_info.end_dt.is_none() { 
-            (Utc::now() - calc_info.run_dt).num_seconds() 
+            (Utc::now() - calc_info.run_dt).num_seconds()
         } else { 
             (calc_info.end_dt.unwrap() - calc_info.run_dt).num_seconds()
         }   
     }; 
-    
 
     Ok(Json(GetCalcStatusResponse {
         run_dt: calc_info.run_dt,

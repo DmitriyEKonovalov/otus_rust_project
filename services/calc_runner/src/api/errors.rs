@@ -1,5 +1,6 @@
 use axum::{http::StatusCode, response::IntoResponse, Json};
 use serde::Serialize;
+use crate::storage::StorageErrors;
 
 // структура для сообщения об ошибке
 #[derive(Debug, Serialize)]
@@ -10,10 +11,8 @@ pub struct ErrorResponse {
 // перечисление специфичных ошибок API
 #[derive(Debug, thiserror::Error)]
 pub enum ApiError {
-    #[error(transparent)]
-    Redis(DataError),
-    #[error("Redis error: {0}")]
-    RedisClient(#[from] redis::RedisError),
+    #[error("Storage error: {0}")]
+    StorageError(#[from] redis::RedisError),
     #[error("Bad params: {0}")]
     BadParams(String),
     #[error("Invalid JSON: {0}")]
@@ -29,7 +28,7 @@ impl IntoResponse for ApiError {
         let status = match self {
             ApiError::BadParams(_) => StatusCode::BAD_REQUEST,
             ApiError::Json(_) => StatusCode::BAD_REQUEST,
-            ApiError::Redis(_) | ApiError::RedisClient(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ApiError::StorageError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ApiError::NotFound => StatusCode::NOT_FOUND,
             ApiError::CalculationNotCompleted(_) => StatusCode::BAD_REQUEST,
         };
@@ -40,11 +39,12 @@ impl IntoResponse for ApiError {
     }
 }
 
-impl From<DataError> for ApiError {
-    fn from(value: DataError) -> Self {
+impl From<StorageErrors> for ApiError {
+    fn from(value: StorageErrors) -> Self {
         match value {
-            DataError::NotFound => ApiError::NotFound,
-            other => ApiError::Redis(other),
+            StorageErrors::NotFound(_) => ApiError::NotFound,
+            StorageErrors::Json(other) => ApiError::Json(serde_json::Error::io(std::io::Error::new(std::io::ErrorKind::Other, other))),
+            StorageErrors::Client(other) => ApiError::StorageError(redis::RedisError::from(std::io::Error::new(std::io::ErrorKind::Other, other))),
         }
     }
 }

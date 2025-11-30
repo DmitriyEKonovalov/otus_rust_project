@@ -1,12 +1,13 @@
-
 use axum::{
     extract::{Path, State},
     Json,
 };
 use serde::Serialize;
 use uuid::Uuid;
+use crate::app_state::AppState;
+use crate::api::ApiError;
+use crate::models::{CalcInfo, CALC_INFO_PREFIX};
 
-use crate::exceptions::api_errors::ApiError;
 
 #[derive(Debug, Serialize)]
 pub struct GetCalcResultResponse {
@@ -26,8 +27,9 @@ pub async fn get_calc_result(
     State(state): State<AppState>,
     Path(calc_id): Path<Uuid>,
 ) -> Result<Json<GetCalcResultResponse>, ApiError> {
-    let mut conn: redis::aio::MultiplexedConnection = state.redis_client.get_multiplexed_async_connection().await?;
-    let calc_info = CalcInfo::get(&mut conn, calc_id).await.map_err(ApiError::from)?;
+    let storage = state.storage.clone(); 
+    let key: String = format!("{}{}", CALC_INFO_PREFIX, calc_id);
+    let calc_info:CalcInfo = storage.get(&key).await.map_err(ApiError::from)?;
 
     if calc_info.end_dt.is_none() {
         return Err(ApiError::CalculationNotCompleted(calc_id));

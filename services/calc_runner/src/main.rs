@@ -1,6 +1,8 @@
 mod api;
+mod app_state;
 mod calcs;
-mod utils;
+mod models;
+mod storage;
 
 use std::sync::Arc;
 
@@ -24,9 +26,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _: String = redis::cmd("PING").query(&mut ping_conn)?;
 
     println!("...Connected to Redis");
-    let app_state = AppState {
-        redis_client: Arc::new(redis_client),
-    };
+    let storage = storage::Storage { client: Arc::new(redis_client.clone()) };
+    let app_state = app_state::AppState {storage: storage };
+
     let app = Router::new()
         .route("/api/calc/base_calc", post(run_base_calc))
         .route("/api/calc/mass_calc", post(run_mass_calc))
