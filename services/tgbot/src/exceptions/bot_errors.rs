@@ -1,4 +1,3 @@
-use common::DataError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -16,13 +15,3 @@ pub enum BotError {
 }
 
 pub type HandlerResult = Result<(), BotError>;
-
-impl From<DataError> for BotError {
-    fn from(err: DataError) -> Self {
-        match err {
-            DataError::Redis(e) => BotError::Redis(e),
-            DataError::Json(e) => BotError::Json(e),
-            DataError::NotFound => BotError::Parse("Not found".into()),
-        }
-    }
-}

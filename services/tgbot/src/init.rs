@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use common::{Role, User};
 use redis::AsyncCommands;
 
 use crate::errors::BotError;

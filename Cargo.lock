@@ -150,7 +150,6 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "chrono",
- "common",
  "rand 0.8.5",
  "redis",
  "serde",
@@ -208,18 +207,6 @@ dependencies = [
  "pin-project-lite",
  "tokio",
  "tokio-util",
-]
-
-[[package]]
-name = "common"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "redis",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "uuid",
 ]
 
 [[package]]
@@ -1980,7 +1967,6 @@ name = "tgbot"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "common",
  "dotenvy",
  "futures",
  "redis",

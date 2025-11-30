@@ -1,4 +1,3 @@
-pub mod errors;
 pub mod get_calc_result;
 pub mod get_calc_status;
 pub mod run_base_calc;

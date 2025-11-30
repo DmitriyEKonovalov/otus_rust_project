@@ -1,7 +1,5 @@
 use std::future::Future;
 use std::sync::Arc;
-
-use common::CalcInfo;
 use serde_json;
 use uuid::Uuid;
 

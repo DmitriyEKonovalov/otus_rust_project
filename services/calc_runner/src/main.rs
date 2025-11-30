@@ -8,7 +8,6 @@ use axum::{
     routing::{post},
     Router,
 };
-use common::redis::AppState;
 use tokio::net::TcpListener;
 
 use crate::api::{

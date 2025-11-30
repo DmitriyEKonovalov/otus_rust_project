@@ -1,4 +1,3 @@
-use crate::models::errors;  
 use errors::DataError;
 use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};

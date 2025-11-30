@@ -1,5 +1,4 @@
 use axum::{http::StatusCode, response::IntoResponse, Json};
-use common::DataError;
 use serde::Serialize;
 
 // структура для сообщения об ошибке

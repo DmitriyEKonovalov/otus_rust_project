@@ -1,7 +1,6 @@
 [workspace]
 resolver = "2"
 members = [
-    "common",
     "services/calc_runner",
     "services/tgbot",
 ]

@@ -3,12 +3,10 @@ use axum::{
     extract::{Path, State},
     Json,
 };
-use common::CalcInfo;
-use common::redis::AppState;
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::api::errors::ApiError;
+use crate::exceptions::api_errors::ApiError;
 
 #[derive(Debug, Serialize)]
 pub struct GetCalcResultResponse {
