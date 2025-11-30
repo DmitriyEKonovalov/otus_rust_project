@@ -3,9 +3,8 @@ use axum::{
     extract::{Path, State},
     Json,
 };
-use common::{
-    calc_info::{get_calc_info, AppState},
-};
+use common::CalcInfo;
+use common::redis::AppState;
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -29,8 +28,8 @@ pub async fn get_calc_result(
     State(state): State<AppState>,
     Path(calc_id): Path<Uuid>,
 ) -> Result<Json<GetCalcResultResponse>, ApiError> {
-    let mut conn = state.redis_client.get_connection()?;
-    let calc_info = get_calc_info(&mut conn, calc_id).map_err(ApiError::from)?;
+    let mut conn: redis::aio::MultiplexedConnection = state.redis_client.get_multiplexed_async_connection().await?;
+    let calc_info = CalcInfo::get(&mut conn, calc_id).await.map_err(ApiError::from)?;
 
     if calc_info.end_dt.is_none() {
         return Err(ApiError::CalculationNotCompleted(calc_id));

@@ -3,10 +3,8 @@ use axum::{
     Json,
 };
 use chrono::Utc;
-use common::{
-    calc_info::CalcInfo,
-    redis::{get_calc_info, AppState},
-};
+use common::CalcInfo;
+use crate::state::AppState;
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -26,22 +24,21 @@ pub async fn get_calc_status(
     State(state): State<AppState>,
     Path(calc_id): Path<Uuid>,
 ) -> Result<Json<GetCalcStatusResponse>, ApiError> {
-    let mut conn = state.redis_client.get_connection()?;
-    let calc_info = get_calc_info(&mut conn, calc_id)?;
-    let CalcInfo { run_dt, progress, end_dt, .. } = calc_info;
+    let mut conn: redis::aio::MultiplexedConnection = state.redis_client.get_multiplexed_async_connection().await?;
+    let calc_info = CalcInfo::get(&mut conn, calc_id).await.map_err(ApiError::from)?;
     
     let duration: i64 = {
-        if end_dt.is_none() { 
-            (Utc::now() - run_dt).num_seconds() 
+        if calc_info.end_dt.is_none() { 
+            (Utc::now() - calc_info.run_dt).num_seconds() 
         } else { 
-            (end_dt.unwrap() - run_dt).num_seconds()
+            (calc_info.end_dt.unwrap() - calc_info.run_dt).num_seconds()
         }   
     }; 
     
 
     Ok(Json(GetCalcStatusResponse {
-        run_dt,
-        progress,
+        run_dt: calc_info.run_dt,
+        progress: calc_info.progress,
         duration,
     }))
 }

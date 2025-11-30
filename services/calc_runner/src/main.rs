@@ -28,7 +28,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_state = AppState {
         redis_client: Arc::new(redis_client),
     };
-
     let app = Router::new()
         .route("/api/calc/base_calc", post(run_base_calc))
         .route("/api/calc/mass_calc", post(run_mass_calc))

@@ -1,34 +1,30 @@
-﻿mod commands;
+mod auth;
+mod commands;
+mod errors;
+mod init;
 mod settings;
 
 use std::sync::Arc;
 
 use dotenvy::dotenv;
 use teloxide::{
-    dispatching::{
-        dialogue::InMemStorage,
-        UpdateFilterExt,
-    },
+    dispatching::{dialogue::InMemStorage, UpdateFilterExt},
     dptree,
     prelude::*,
     types::{CallbackQuery, Message},
 };
 
-use auth::seed_users;
-use commands::{
+use crate::commands::{
     calc_handle, callback_handle, help_handle, message_handle, run_result_watcher, start_handle,
     users_calc_handle, BotDialogue, Command, DialogueState,
 };
-use errors::{BotError, HandlerResult};
-use settings::{BotConfig, BotState, DEFAULT_MAX_CALCS};
+use crate::errors::{BotError, HandlerResult};
+use crate::init::create_users;
+use crate::settings::{BotConfig, BotState, DEFAULT_MAX_CALCS};
 
 #[tokio::main]
 async fn main() -> Result<(), BotError> {
     dotenv().ok();
-
-    
-    // Инициализация бота и проверка состояния используемых сервисов
-    // создание коннектов к Redis и Calc Runner
 
     let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| {
         let host = std::env::var("REDIS_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
@@ -49,12 +45,9 @@ async fn main() -> Result<(), BotError> {
     let calc_runner_base =
         std::env::var("CALC_RUNNER_URL").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string());
 
-    // СЃРѕР·РґР°РЅРёРµ Р±РѕС‚Р°
     let bot_token = std::env::var("BOT_TOKEN").expect("BOT_TOKEN is required in .env");
     let bot: Bot = Bot::new(bot_token);
 
-
-    // СЃРѕР·РґР°РЅРёРµ РЅР°С‡Р°Р»СЊРЅС‹С… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ РІ Redis
     create_users(redis_client.clone()).await?;
 
     let state = Arc::new(BotState {
@@ -67,7 +60,7 @@ async fn main() -> Result<(), BotError> {
     });
 
     let bot_for_worker = bot.clone();
-    let state_for_worker = state.clone();
+    let state_for_worker = Arc::clone(&state);
     tokio::spawn(async move {
         run_result_watcher(bot_for_worker, state_for_worker).await;
     });
@@ -110,7 +103,12 @@ async fn handle_command(
     }
 }
 
-async fn handle_message(bot: Bot, state: Arc<BotState>, dialogue: BotDialogue, msg: Message) -> HandlerResult {
+async fn handle_message(
+    bot: Bot,
+    state: Arc<BotState>,
+    dialogue: BotDialogue,
+    msg: Message,
+) -> HandlerResult {
     message_handle(bot, state, dialogue, msg).await
 }
 

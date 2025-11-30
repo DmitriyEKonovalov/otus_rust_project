@@ -1,30 +1,44 @@
-use std::{sync::Arc, thread};
+use std::future::Future;
+use std::sync::Arc;
 
-use common::redis::set_result;
+use common::CalcInfo;
+use serde_json;
 use uuid::Uuid;
 
 use crate::api::errors::ApiError;
 
-// Вспомогательная функция для запуска расчета в отдельном потоке, 
-// который запускается в хэндлере, но продолжает работать после выхода из него.   
-// Принимает id расчета, функцию, параметры к ней и клиент Redis  
-pub fn spawn_calc(
+pub fn spawn_calc<F, Fut>(
     calc_id: Uuid,
-    calc_fn: fn(Uuid, &mut redis::Connection, Option<serde_json::Value>) -> Result<(), ApiError>,
+    calc_fn: F,
     params: Option<serde_json::Value>,
     client: Arc<redis::Client>,
-) {
-    thread::spawn(move || match client.get_connection() {
-        Ok(mut conn) => {
-            if let Err(e) = calc_fn(calc_id, &mut conn, params) {
-                eprintln!("? Calculation failed for {}: {}", calc_id, e);
-                let _ = set_result(&mut conn, calc_id, serde_json::json!({
-                    "error": e.to_string()
-                }));
+) where
+    F: Fn(
+            Uuid,
+            &mut redis::aio::MultiplexedConnection,
+            Option<serde_json::Value>,
+        ) -> Fut
+        + Send
+        + Sync
+        + 'static,
+    Fut: Future<Output = Result<(), ApiError>> + Send + 'static,
+{
+    tokio::spawn(async move {
+        match client.get_multiplexed_async_connection().await {
+            Ok(mut conn) => {
+                if let Err(e) = calc_fn(calc_id, &mut conn, params).await {
+                    eprintln!("Calculation failed for {}: {}", calc_id, e);
+                    let _ = CalcInfo::set_result(
+                        &mut conn,
+                        calc_id,
+                        serde_json::json!({ "error": e.to_string() }),
+                    )
+                    .await;
+                }
             }
-        }
-        Err(e) => {
-            eprintln!("? Failed to get Redis connection in worker: {}", e);
+            Err(e) => {
+                eprintln!("Failed to get Redis connection in worker: {}", e);
+            }
         }
     });
 }

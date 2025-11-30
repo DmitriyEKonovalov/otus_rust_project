@@ -2,10 +2,8 @@ use std::sync::Arc;
 
 use axum::{extract::State, Json};
 use chrono::Utc;
-use common::{
-    calc_info::CalcInfo,
-    redis::{set_calc_info, AppState},
-};
+use common::CalcInfo;
+use common::AppState;
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -40,8 +38,17 @@ pub async fn run_mass_calc(
         result: None,
     };
 
-    let mut conn = state.redis_client.get_connection()?;
-    set_calc_info(&mut conn, calc_id, &initial_info)?;
+    let mut conn = state.redis_client.get_multiplexed_async_connection().await?;
+    {
+        let this = initial_info;
+        let conn: &mut impl AsyncCommands = &mut conn;
+        async move {
+            let key: String = format!("{}{}", CALC_INFO_PREFIX, this.calc_id);
+            let json = serde_json::to_string(&this)?;
+            let _: () = conn.set_ex(key, json, CALC_INFO_TTL_SECONDS).await?;
+            Ok(())
+        }
+    }.await?;
 
     let client_clone = Arc::clone(&state.redis_client);
     let params_clone = Some(serde_json::to_value(&payload)?);

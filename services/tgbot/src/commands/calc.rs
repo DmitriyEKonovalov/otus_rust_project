@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::Instant};
 
 use chrono::{DateTime, Utc};
-use common::{calc_info::CalcInfo, redis::get_calc_info_async};
+use common::{CalcInfo, DataError};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use teloxide::{
@@ -109,7 +109,8 @@ pub async fn message_handle(
             }
 
             let calc_id = start_base_calc(&state, iterations).await?;
-            UsersCalcs::add_calc(&state, user.user_id, calc_id).await?;
+            let mut conn = state.redis_client.get_async_connection().await?;
+            UsersCalcs::add_calc(&mut conn, user.user_id, calc_id).await?;
 
             bot.send_message(chat_id, format!(CALC_STARTED_TEMPLATE, calc_id))
                 .reply_markup(status_markup(calc_id, false))
@@ -133,7 +134,8 @@ pub async fn message_handle(
             }
 
             let calc_id = start_full_calc(&state, iterations, data.clone()).await?;
-            UsersCalcs::add_calc(&state, user.user_id, calc_id).await?;
+            let mut conn = state.redis_client.get_async_connection().await?;
+            UsersCalcs::add_calc(&mut conn, user.user_id, calc_id).await?;
 
             bot.send_message(
                 chat_id,
@@ -266,7 +268,8 @@ pub async fn send_result(bot: &Bot, state: &Arc<BotState>, chat_id: ChatId, calc
                 result_json
             );
             bot.send_message(chat_id, text).await?;
-            UsersCalcs::remove_calc(state, chat_id.0, calc_id).await?;
+            let mut conn = state.redis_client.get_async_connection().await?;
+            UsersCalcs::remove_calc(&mut conn, chat_id.0, calc_id).await?;
         }
         Err(e) => {
             bot.send_message(chat_id, format!("Не удалось получить результат: {}", e)).await?;
@@ -328,7 +331,7 @@ async fn check_and_send_results(
                             }
                         }
                         bot.send_message(chat_id, text).await?;
-                        UsersCalcs::remove_calc(state, user_id, calc_id).await?;
+                        UsersCalcs::remove_calc(&mut conn, user_id, calc_id).await?;
                         *last_send = Some(Instant::now());
                     }
                 }
@@ -343,11 +346,10 @@ async fn fetch_calc_info(
     conn: &mut impl redis::AsyncCommands,
     calc_id: Uuid,
 ) -> Result<Option<CalcInfo>, BotError> {
-    match get_calc_info_async(conn, calc_id).await {
+    match CalcInfo::get(conn, calc_id).await {
         Ok(info) => Ok(Some(info)),
-        Err(common::redis::RedisDataError::NotFound) => Ok(None),
-        Err(common::redis::RedisDataError::Redis(err)) => Err(BotError::Redis(err)),
-        Err(common::redis::RedisDataError::Json(err)) => Err(BotError::Json(err)),
+        Err(DataError::NotFound) => Ok(None),
+        Err(err) => Err(err.into()),
     }
 }
 

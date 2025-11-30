@@ -1,13 +1,15 @@
-use redis::{AsyncCommands, RedisResult, RedisDataError};
+use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, sync::Arc};
+use serde_json;
+use std::collections::HashSet;
 use uuid::Uuid;
-use std::collections::HashMap;
 
-const USER_CALCS_PREFIX: &str = "user_calc:";
-const USER_CALCS_TTL_SECONDS: u64 = 24 * 3600; 
+use crate::models::errors;
+use errors::DataError;
 
-// Дополнительная структура для хранения информации о расчетах пользователя
+pub const USER_CALCS_PREFIX: &str = "user_calc:";
+const USER_CALCS_TTL_SECONDS: u64 = 24 * 3600;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsersCalcs {
     pub user_id: i64,
@@ -15,87 +17,77 @@ pub struct UsersCalcs {
 }
 
 impl UsersCalcs {
-    
-    // получение записей о расчетах пользователя из Redis (внутренняя)
-    async fn get(conn: &mut impl AsyncCommands, user_id: i64) -> RedisResult<UsersCalcs, RedisDataError::NotFound> {
-        let key = format!("{}{}", REDIS_USER_CALCS_PREFIX, user_id);
-        let value: Option<String> = conn.get(&key).await?;  
-        match value {
-            Some(v) => {
-                let record: UsersCalcs = serde_json::from_str(&v)?;
-                Ok(Some(record))
-            },
-            None => Ok(None),
-        }
+    async fn load_raw(conn: &mut impl AsyncCommands, user_id: i64) -> Result<UsersCalcs, DataError> {
+        let key = format!("{}{}", USER_CALCS_PREFIX, user_id);
+        let value: String = conn.get(&key).await.map_err(|_| DataError::NotFound)?;
+        let record: UsersCalcs = serde_json::from_str(&value)?;
+        Ok(record)
     }
-    
-    // создание пустой записи о расчетах пользователя в Redis (внутренняя)
-    async fn create(conn: &mut impl AsyncCommands, user_id: i64) -> RedisResult<> {
-        let record = UsersCalcs {
+
+    async fn create(conn: &mut impl AsyncCommands, user_id: i64) -> Result<UsersCalcs, DataError> {
+        let users_calcs = UsersCalcs {
             user_id,
             calcs: HashSet::new(),
         };
-        let key = format!("{}{}", REDIS_USER_CALCS_PREFIX, user_id);
-        let json = serde_json::to_string(&record)?;
-        conn.set(key, json).await?;
-        Ok(Some(record))
+        users_calcs.save(conn).await?;
+        Ok(users_calcs)
     }
 
-    // обновление записей о расчетах пользователя в Redis (внутренняя)
-    async fn update(&self, conn: &mut impl AsyncCommands) -> RedisResult<UsersCalcs> {
-        let key = format!("{}{}", REDIS_USER_CALCS_PREFIX, self.user_id);
+    async fn save(&self, conn: &mut impl AsyncCommands) -> Result<(), DataError> {
+        let key = format!("{}{}", USER_CALCS_PREFIX, self.user_id);
         let json = serde_json::to_string(self)?;
-        conn.set(key, json).await?;
+        let _: () = conn.set_ex(key, json, USER_CALCS_TTL_SECONDS).await?;
         Ok(())
     }
-    
-    // добавление расчета пользователя в Redis 
-    //  - если записи для пользователя нет, создается новая с добавленным расчетом
-    //  - если запись есть, расчет добавляется в коллекцию расчетов
-    pub async fn add_calc_to_user(conn: &mut impl AsyncCommands, user_id: i64, calc_id: Uuid) -> RedisResult<UsersCalcs> {
-        let mut users_calcs = match UsersCalcs::get(&mut conn, user_id).await? {
-            Some(r) => r,
-            None => UsersCalcs::create(&mut conn, user_id).await?.unwrap(),
+
+    pub async fn load(
+        conn: &mut impl AsyncCommands,
+        user_id: i64,
+    ) -> Result<Option<UsersCalcs>, DataError> {
+        match UsersCalcs::load_raw(conn, user_id).await {
+            Ok(record) => Ok(Some(record)),
+            Err(DataError::NotFound) => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
+
+    pub async fn add_calc(
+        conn: &mut impl AsyncCommands,
+        user_id: i64,
+        calc_id: Uuid,
+    ) -> Result<(), DataError> {
+        let mut users_calcs = match UsersCalcs::load_raw(conn, user_id).await {
+            Ok(record) => record,
+            Err(_) => UsersCalcs::create(conn, user_id).await?,
         };
         users_calcs.calcs.insert(calc_id);
-        users_calcs.update(&mut conn).await?;
-        Ok(())
+        users_calcs.save(conn).await
     }
 
-    // удаление расчета пользователя из Redis, если расчетов нет - удаление всей записи
-    pub async fn remove_calc_from_user(conn: &mut impl AsyncCommands, user_id: i64, calc_id: Uuid) -> RedisResult<UsersCalcs> {
-        if let Some(mut users_calcs) = UsersCalcs::get(&mut conn, user_id).await? {
-            users_calcs.calcs.remove(&calc_id);
-            if users_calcs.calcs.is_empty() {
-                let key = format!("{}{}", REDIS_USER_CALCS_PREFIX, user_id);
-                conn.del(key).await?;
-            } else {
-                users_calcs.update(&mut conn).await?;
-            }
+    pub async fn remove_calc(
+        conn: &mut impl AsyncCommands,
+        user_id: i64,
+        calc_id: Uuid,
+    ) -> Result<(), DataError> {
+        let Some(mut users_calcs) = UsersCalcs::load(conn, user_id).await? else {
+            return Ok(());
+        };
+
+        users_calcs.calcs.remove(&calc_id);
+        if users_calcs.calcs.is_empty() {
+            let key = format!("{}{}", USER_CALCS_PREFIX, user_id);
+            let _: () = conn.del(key).await?;
+        } else {
+            users_calcs.save(conn).await?;
         }
         Ok(())
     }
 
-}
-
-// Структура для хранения статистики по расчетам всем пользователей 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UsersCalcStats {
-    pub total_running: u32,
-    pub calcs: HashMap<u64,Vec<UsersCalcs>>,
-}
-
-impl UsersCalcStats {
-    // Получение статичтики из Redis
-    pub async fn get_stats(conn: &mut impl AsyncCommands) -> RedisResult<UsersCalcStats> {
-        let keys: Vec<String> = redis::cmd("KEYS")
-            .arg(format!("{}*", REDIS_USER_CALCS_PREFIX))
-            .query_async(conn)
-            .await?;
+    pub async fn list_tracked_users(conn: &mut impl AsyncCommands) -> Result<Vec<i64>, DataError> {
+        let keys: Vec<String> = conn.keys(format!("{}*", USER_CALCS_PREFIX)).await?;
         let ids = keys
             .into_iter()
-            .filter_map(|k| k.strip_prefix(REDIS_USER_CALCS_PREFIX))
-            .filter_map(|id| id.parse::<i64>().ok())
+            .filter_map(|key| key.trim_start_matches(USER_CALCS_PREFIX).parse::<i64>().ok())
             .collect();
         Ok(ids)
     }
@@ -104,4 +96,19 @@ impl UsersCalcStats {
         self.calcs.iter().copied().collect()
     }
 
+    pub async fn add_calc_to_user(
+        conn: &mut impl AsyncCommands,
+        user_id: i64,
+        calc_id: Uuid,
+    ) -> Result<(), DataError> {
+        UsersCalcs::add_calc(conn, user_id, calc_id).await
+    }
+
+    pub async fn remove_calc_from_user(
+        conn: &mut impl AsyncCommands,
+        user_id: i64,
+        calc_id: Uuid,
+    ) -> Result<(), DataError> {
+        UsersCalcs::remove_calc(conn, user_id, calc_id).await
+    }
 }

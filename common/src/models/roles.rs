@@ -1,11 +1,4 @@
-use crate::errors::BotError;
-use crate::settings::{BotState, REDIS_USER_CALCS_PREFIX, REDIS_USER_PREFIX};
-use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, sync::Arc};
-use teloxide::{prelude::*, types::Message};
-use uuid::Uuid;
-
 
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

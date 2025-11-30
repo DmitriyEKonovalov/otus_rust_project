@@ -1,30 +1,20 @@
 use crate::api::errors::ApiError;
-use common::redis::{set_result, update_progress};
+use common::CalcInfo;
 use rand::Rng;
-use redis::Connection;
+use redis::aio::MultiplexedConnection;
 use serde::{Deserialize, Serialize};
-use std::thread::sleep;
 use std::time::Duration;
+use tokio::time::sleep;
 use uuid::Uuid;
-
-//
-// Простая функция (base_calc), имитирующая тяжелый расчет, запускаемая в отдельном потоке. 
-// - получет кол-во итераций n
-// - создает последовательность n чисел -100..100, с интервалом в 10 сек 
-// - возвращает (записывает в redis) в поле с результатом json вида 
-// { 
-//     "simulations": [10, 20, 55, -3 ...] 
-// } 
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BaseCalcParams {
     pub iterations: u32,
 }
 
-pub fn base_calc(
+pub async fn base_calc(
     calc_id: Uuid,
-    conn: &mut Connection,
+    conn: &mut MultiplexedConnection,
     params: Option<serde_json::Value>,
 ) -> Result<(), ApiError> {
     let params: BaseCalcParams = params
@@ -40,21 +30,22 @@ pub fn base_calc(
     let mut simulations = Vec::with_capacity(params.iterations as usize);
 
     for i in 0..params.iterations {
-        sleep(Duration::from_secs(10));
+        sleep(Duration::from_secs(10)).await;
         let value = rng.gen_range(-100..=100);
         simulations.push(value);
 
         let progress = ((i + 1) * 100) / params.iterations;
-        update_progress(conn, calc_id, progress)?;
+        CalcInfo::update_progress(conn, calc_id, progress).await?;
     }
 
-    set_result(
+    CalcInfo::set_result(
         conn,
         calc_id,
         serde_json::json!({
             "simulations": simulations,
         }),
-    )?;
+    )
+    .await?;
 
     Ok(())
 }

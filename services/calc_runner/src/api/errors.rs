@@ -1,5 +1,5 @@
 use axum::{http::StatusCode, response::IntoResponse, Json};
-use common::redis::RedisDataError;
+use common::DataError;
 use serde::Serialize;
 
 // структура для сообщения об ошибке
@@ -12,7 +12,7 @@ pub struct ErrorResponse {
 #[derive(Debug, thiserror::Error)]
 pub enum ApiError {
     #[error(transparent)]
-    Redis(RedisDataError),
+    Redis(DataError),
     #[error("Redis error: {0}")]
     RedisClient(#[from] redis::RedisError),
     #[error("Bad params: {0}")]
@@ -41,10 +41,10 @@ impl IntoResponse for ApiError {
     }
 }
 
-impl From<RedisDataError> for ApiError {
-    fn from(value: RedisDataError) -> Self {
+impl From<DataError> for ApiError {
+    fn from(value: DataError) -> Self {
         match value {
-            RedisDataError::NotFound => ApiError::NotFound,
+            DataError::NotFound => ApiError::NotFound,
             other => ApiError::Redis(other),
         }
     }

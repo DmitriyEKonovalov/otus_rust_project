@@ -1,5 +1,11 @@
-pub mod redis;
 pub mod calc_info;
+pub mod roles;
+pub mod users;
+pub mod user_calcs;
+pub mod errors;
 
 pub use calc_info::CalcInfo;
-pub use redis::{AppState, RedisDataError, RedisResult, RedisDataError};
+pub use roles::Role;
+pub use users::User;
+pub use user_calcs::UsersCalcs;
+pub use errors::DataError;

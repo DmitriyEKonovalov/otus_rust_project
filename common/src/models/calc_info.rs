@@ -1,11 +1,13 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use redis::{Commands, Connection, RedisResult};
-use crate::redis::RedisDataError;
+use redis::AsyncCommands;
 use serde_json;
 
-const CALC_INFO_PREFIX: &str = "calc_info:";
+use crate::models::errors;
+use errors::DataError;
+
+pub const CALC_INFO_PREFIX: &str = "calc_info:";
 const CALC_INFO_TTL_SECONDS: u64 = 24 * 3600; // 24 часа
 
 // Структура для работы с расчетами пользователя
@@ -32,37 +34,31 @@ impl CalcInfo {
     }
 
     //  сохранить параметры расчета в Redis
-    pub async fn set(conn: &mut Connection, calc_id: Uuid, info: &CalcInfo) -> RedisResult<()> {
-        let key: String = format!("{}{}", CALC_INFO_PREFIX, calc_id);
-        let json = serde_json::to_string(info)
-            .map_err(|_| redis::RedisError::from((redis::ErrorKind::TypeError, "Serialization failed")))?;
-        conn.set_ex(key, json, CALC_INFO_TTL_SECONDS)?;
+    pub async fn set(self, conn: &mut impl AsyncCommands) -> Result<(), DataError> {
+        let key: String = format!("{}{}", CALC_INFO_PREFIX, self.calc_id);
+        let json = serde_json::to_string(&self)?;
+        let _: () = conn.set_ex(key, json, CALC_INFO_TTL_SECONDS).await?;
         Ok(())
     }
 
     //  получить информацию о расчете из Redis
-    pub async fn get(conn: &mut Connection, calc_id: Uuid) -> RedisResult<CalcInfo> {
+    pub async fn get(conn: &mut impl AsyncCommands, calc_id: Uuid) -> Result<CalcInfo, DataError> {
         let key: String = format!("{}{}", CALC_INFO_PREFIX, calc_id);
-        let value: String = conn.get(&key)?;
-        let info: CalcInfo = serde_json::from_str(&value).map_err(|e| RedisDataError::NotFound)?;
+        let value: String = conn.get(&key).await.map_err(|_| DataError::NotFound)?;
+        let info: CalcInfo = serde_json::from_str(&value)?;
         Ok(info)
     }
 
 
     //  обновить прогресс расчета в Redis
-    pub async fn update_progress(conn: &mut Connection, calc_id: Uuid, progress: u32) -> RedisResult<()> {
+    pub async fn update_progress(self, conn: &mut impl AsyncCommands, calc_id: Uuid, progress: u32) -> Result<(), DataError> {
         let mut calc_info = CalcInfo::get(conn, calc_id).await?;
-
         calc_info.progress = progress;
         CalcInfo::set(conn, calc_id, &calc_info).await
     }
 
     //  сохранить результат расчета в Redis
-    pub async fn set_result(
-        conn: &mut Connection,
-        calc_id: Uuid,
-        result: serde_json::Value,
-    ) -> RedisResult<()> {
+    pub async fn set_result(conn: &mut impl AsyncCommands, calc_id: Uuid,result: serde_json::Value,) -> Result<(), DataError> {
         let mut calc_info = CalcInfo::get(conn, calc_id).await?;
 
         calc_info.end_dt = Some(Utc::now());
@@ -70,5 +66,6 @@ impl CalcInfo {
         calc_info.progress = 100;
         CalcInfo::set(conn, calc_id, &calc_info).await
     }
+
 
 }
