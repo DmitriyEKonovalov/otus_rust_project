@@ -2,13 +2,13 @@ use std::time::Duration;
 use tokio::time::sleep;
 use chrono::Utc;
 use crate::models::{CalcInfo, CALC_INFO_PREFIX, CALC_INFO_TTL_SECONDS};
-use crate::storage::Storage;
+use crate::storage::SharedStorage;
 use crate::api::ApiError;
 use crate::api::run_base_calc::BaseCalcParams;
 
 pub async fn base_calc(
     calc_info: CalcInfo,
-    storage: Storage,
+    storage: SharedStorage,
 ) -> Result<(), ApiError> {
 
     let mut calc_info = calc_info.clone();
@@ -29,8 +29,7 @@ pub async fn base_calc(
         calc_info.progress = ((i + 1) * 100) / calc_params.iterations;
 
         // обновление прогресса в хранилище
-        let value = serde_json::to_string(&calc_info)?;
-        storage.set(&calc_key, &value, CALC_INFO_TTL_SECONDS).await.map_err(ApiError::from)?;
+        storage.set(&calc_key, &calc_info, CALC_INFO_TTL_SECONDS).await.map_err(ApiError::from)?;
 
     }
 
@@ -40,8 +39,7 @@ pub async fn base_calc(
     calc_info.end_dt = Some(chrono::Utc::now());
     calc_info.progress = 100;
 
-    let value = serde_json::to_string(&calc_info)?;
-    storage.set(&calc_key, &value, CALC_INFO_TTL_SECONDS).await.map_err(ApiError::from)?;
+    storage.set(&calc_key, &calc_info, CALC_INFO_TTL_SECONDS).await.map_err(ApiError::from)?;
 
     Ok(())
 }

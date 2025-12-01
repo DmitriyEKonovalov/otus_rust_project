@@ -12,6 +12,7 @@ use crate::models::{CalcInfo, CALC_INFO_PREFIX};
 #[derive(Debug, Serialize)]
 pub struct GetCalcResultResponse {
     pub calc_id: Uuid,
+    pub user_id: i64,
     pub run_dt: chrono::DateTime<chrono::Utc>,
     pub end_dt: Option<chrono::DateTime<chrono::Utc>>,
     pub params: Option<serde_json::Value>,
@@ -22,12 +23,11 @@ pub struct GetCalcResultResponse {
 
 //
 // Обработчик запросов на получение результатов расчета
-//
 pub async fn get_calc_result(
     State(state): State<AppState>,
     Path(calc_id): Path<Uuid>,
 ) -> Result<Json<GetCalcResultResponse>, ApiError> {
-    let storage = state.storage.clone(); 
+    let storage = state.storage; 
     let key: String = format!("{}{}", CALC_INFO_PREFIX, calc_id);
     let calc_info:CalcInfo = storage.get(&key).await.map_err(ApiError::from)?;
 
@@ -37,6 +37,7 @@ pub async fn get_calc_result(
     
     Ok(Json(GetCalcResultResponse {
         calc_id: calc_info.calc_id,
+        user_id: calc_info.user_id,
         run_dt: calc_info.run_dt,
         end_dt: calc_info.end_dt,
         params: calc_info.params,

@@ -1,21 +1,21 @@
-use crate::errors::BotError;
-use crate::settings::{BotState, REDIS_USER_CALCS_PREFIX, REDIS_USER_PREFIX};
-use redis::AsyncCommands;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, sync::Arc};
-use teloxide::{prelude::*, types::Message};
-use uuid::Uuid;
+// use crate::errors::BotError;
+// use crate::settings::{BotState, REDIS_USER_CALCS_PREFIX, REDIS_USER_PREFIX};
+// use redis::AsyncCommands;
+// use serde::{Deserialize, Serialize};
+// use std::{collections::HashSet, sync::Arc};
+// use teloxide::{prelude::*, types::Message};
+// use uuid::Uuid;
 
 
 
-#[macro_export]
-macro_rules! require_role {
-    ($user:expr, $role:expr, $bot:expr, $chat_id:expr) => {{
-        if !$user.user_groups.is_granted($role) {
-            $bot
-                .send_message($chat_id, format!("Недостаточно прав. Нужна роль {:?}.", $role))
-                .await?;
-            return Ok(());
-        }
-    }};
-}
+// #[macro_export]
+// macro_rules! require_role {
+//     ($user:expr, $role:expr, $bot:expr, $chat_id:expr) => {{
+//         if !$user.user_groups.is_granted($role) {
+//             $bot
+//                 .send_message($chat_id, format!("Недостаточно прав. Нужна роль {:?}.", $role))
+//                 .await?;
+//             return Ok(());
+//         }
+//     }};
+// }

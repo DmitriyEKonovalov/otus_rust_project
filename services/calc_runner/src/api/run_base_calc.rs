@@ -11,6 +11,7 @@ use crate::calcs::base_calc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BaseCalcParams {
+    pub user_id: i64,
     pub iterations: u32,
 }
 
@@ -25,7 +26,7 @@ pub async fn run_base_calc(
     State(state): State<AppState>,
     Json(params): Json<BaseCalcParams>,
 ) -> Result<Json<RunBaseCalcResponse>, ApiError> {
-
+    
     let calc_params: BaseCalcParams = params.clone();
     if calc_params.iterations == 0 {
         return Err(ApiError::BadParams("iterations must be > 0".into()));
@@ -34,6 +35,7 @@ pub async fn run_base_calc(
     let calc_id = Uuid::new_v4();
     let calc_info = CalcInfo {
         calc_id: calc_id,
+        user_id: calc_params.user_id,
         run_dt: Utc::now(),
         end_dt: None,
         params: Some(serde_json::to_value(&params).unwrap()),

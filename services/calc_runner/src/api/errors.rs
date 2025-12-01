@@ -45,6 +45,7 @@ impl From<StorageErrors> for ApiError {
             StorageErrors::NotFound(_) => ApiError::NotFound,
             StorageErrors::Json(other) => ApiError::Json(serde_json::Error::io(std::io::Error::new(std::io::ErrorKind::Other, other))),
             StorageErrors::Client(other) => ApiError::StorageError(redis::RedisError::from(std::io::Error::new(std::io::ErrorKind::Other, other))),
+            StorageErrors::Pool(other) => ApiError::StorageError(redis::RedisError::from(std::io::Error::new(std::io::ErrorKind::Other, other))),
         }
     }
 }

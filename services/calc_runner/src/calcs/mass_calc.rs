@@ -2,13 +2,13 @@ use chrono::Utc;
 use std::time::Duration;
 use tokio::time::sleep;
 use crate::models::{CalcInfo, CALC_INFO_PREFIX, CALC_INFO_TTL_SECONDS};
-use crate::storage::Storage;
+use crate::storage::SharedStorage;
 use crate::api::ApiError;
 use crate::api::run_mass_calc::MassCalcParams;
 
 pub async fn mass_calc(
     calc_info: CalcInfo,
-    storage: Storage,
+    storage: SharedStorage,
 ) -> Result<(), ApiError> {
     let mut calc_info = calc_info.clone();
     let calc_key: String = format!("{}{}", CALC_INFO_PREFIX, calc_info.calc_id);

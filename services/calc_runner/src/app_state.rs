@@ -1,6 +1,6 @@
-use crate::storage::Storage;
+use crate::storage::SharedStorage;
 
 #[derive(Clone, Debug)]
-pub struct AppState {
-    pub storage: Storage,
+pub struct AppState { 
+    pub storage: SharedStorage 
 }
