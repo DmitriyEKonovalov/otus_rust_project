@@ -1,6 +1,12 @@
 use deadpool_redis::{Pool, Connection};
 use deadpool_redis::redis::AsyncCommands;
 use std::sync::Arc;
+use chrono::Utc;
+use serde_json::Value;
+
+use crate::models::{CalcInfo, UserCalc};
+use crate::models::{CALC_INFO_PREFIX, CALC_INFO_TTL_SECONDS};
+use crate::models::{USER_CALC_PREFIX, USER_CALC_TTL_SECONDS};
 
 #[derive(Debug)]
 pub enum StorageErrors { 
@@ -42,10 +48,42 @@ impl Storage {
         Ok(())
     }
 
-    pub async fn mget(&self, pattern: &str) -> Result<Vec<String>, StorageErrors> {
+    pub async fn keys(&self, pattern: &str) -> Result<Vec<String>, StorageErrors> {
         let mut conn = self.get_conn().await?;
-        let keys: Vec<String> = conn.keys(pattern).await.map_err(|e| StorageErrors::Client(format!("keys {pattern}: {e}")))?;
+        let pattern = if pattern.ends_with('*') { pattern.to_owned() } else { format!("{pattern}*") };
+        let keys: Vec<String> = conn.keys(&pattern).await.map_err(|e| StorageErrors::Client(format!("keys {pattern}: {e}")))?;
         Ok(keys)
+    }
+
+    pub async fn start_calc(&self, calc_info: &CalcInfo) -> Result<(), StorageErrors> {
+        let calc_key = format!("{}{}", CALC_INFO_PREFIX, calc_info.calc_id);
+        let user_calc_key = format!("{}{}", USER_CALC_PREFIX, calc_info.user_id);
+        let user_calc = UserCalc { user_id: calc_info.user_id, calc_id: calc_info.calc_id };
+
+        self.set(&calc_key, calc_info, CALC_INFO_TTL_SECONDS).await?;
+        self.set(&user_calc_key, &user_calc, USER_CALC_TTL_SECONDS).await?;
+        Ok(())
+    }
+
+    pub async fn update_progress(&self, calc_info: &CalcInfo, progress: u32) -> Result<(), StorageErrors> {
+        let mut updated = calc_info.clone();
+        updated.progress = progress;
+        let calc_key = format!("{}{}", CALC_INFO_PREFIX, updated.calc_id);
+        self.set(&calc_key, &updated, CALC_INFO_TTL_SECONDS).await
+    }
+
+    pub async fn set_result(&self, calc_info: &CalcInfo, result: Value) -> Result<(), StorageErrors> {
+        let mut updated = calc_info.clone();
+        updated.progress = 100;
+        updated.end_dt = Some(Utc::now());
+        updated.result = Some(result);
+
+        let calc_key = format!("{}{}", CALC_INFO_PREFIX, updated.calc_id);
+        self.set(&calc_key, &updated, CALC_INFO_TTL_SECONDS).await?;
+
+        let user_calc_key = format!("{}{}", USER_CALC_PREFIX, updated.user_id);
+        self.del(&user_calc_key).await?;
+        Ok(())
     }
 
 }

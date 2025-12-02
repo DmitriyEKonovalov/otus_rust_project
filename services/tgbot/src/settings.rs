@@ -1,8 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-pub const REDIS_USER_PREFIX: &str = "USER:";
-pub const REDIS_USER_CALCS_PREFIX: &str = "USERS_CALC::";
-pub const DEFAULT_MAX_CALCS: usize = 3;
+pub const MAX_CALC_FOR_USER: usize = 3;
 pub const RESULT_POLL_INTERVAL: Duration = Duration::from_secs(15);
 pub const SEND_THROTTLE: Duration = Duration::from_millis(800);
 

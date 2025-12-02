@@ -1,12 +1,13 @@
 use axum::{
-    extract::{Path, State},
+    extract::{State},
     Json,
 };
 use serde::Serialize;
 use uuid::Uuid;
 use crate::app_state::AppState;
 use crate::api::ApiError;
-use crate::models::{CalcInfo, CALC_INFO_PREFIX};
+use crate::models::{CalcInfo};
+use crate::models::{USER_CALC_PREFIX};
 
 
 #[derive(Debug, Serialize)]
@@ -29,7 +30,7 @@ pub async fn get_active_calcs(
     State(state): State<AppState>,
 ) -> Result<Json<GetActiveCalcsResponse>, ApiError> {
     let storage = state.storage; 
-    let calcs_keys = storage.mget(CALC_INFO_PREFIX).await.map_err(ApiError::from)?;
+    let calcs_keys = storage.keys(USER_CALC_PREFIX).await.map_err(ApiError::from)?;
     
     let mut calcs: Vec<ShortCalcInfo> = Vec::new();
 
@@ -42,9 +43,7 @@ pub async fn get_active_calcs(
             end_dt: calc_info.end_dt,
             progress: calc_info.progress,
         };
-        if calc_info.end_dt.is_none() {
-            calcs.push(calc);
-        }
+        calcs.push(calc);
     }
 
     Ok(Json(GetActiveCalcsResponse { calcs: calcs,}))

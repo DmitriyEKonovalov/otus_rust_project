@@ -22,7 +22,7 @@ pub async fn get_user_calcs(
     Path(user_id): Path<i64>,
 ) -> Result<Json<GetUserCalcsResponse>, ApiError> {
     let storage = state.storage; 
-    let user_calcs_keys = storage.mget(USER_CALC_PREFIX).await.map_err(ApiError::from)?;
+    let user_calcs_keys = storage.keys(USER_CALC_PREFIX).await.map_err(ApiError::from)?;
     
     let mut calcs: HashSet<Uuid> = HashSet::new();
     for user_calc_key in user_calcs_keys {
