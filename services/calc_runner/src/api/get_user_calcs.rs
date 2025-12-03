@@ -7,7 +7,7 @@ use uuid::Uuid;
 use std::collections::HashSet;
 use crate::app_state::AppState;
 use crate::api::ApiError;
-use crate::models::{UserCalc, USER_CALC_PREFIX};
+use crate::models::UserCalcs;
 
 #[derive(Debug, Serialize)]
 pub struct GetUserCalcsResponse {
@@ -22,18 +22,11 @@ pub async fn get_user_calcs(
     Path(user_id): Path<i64>,
 ) -> Result<Json<GetUserCalcsResponse>, ApiError> {
     let storage = state.storage; 
-    let user_calcs_keys = storage.keys(USER_CALC_PREFIX).await.map_err(ApiError::from)?;
-    
-    let mut calcs: HashSet<Uuid> = HashSet::new();
-    for user_calc_key in user_calcs_keys {
-        let user_calc: UserCalc = storage.get(&user_calc_key).await.map_err(ApiError::from)?;
-        if user_calc.user_id == user_id {
-            calcs.insert(user_calc.calc_id);
-        }
-    }
 
+    let user_calcs: UserCalcs = storage.get(&UserCalcs::to_key(&user_id)).await.map_err(ApiError::from)?;
+    
     Ok(Json(GetUserCalcsResponse {
         user_id: user_id,
-        calcs: calcs,
+        calcs: user_calcs.calcs,
     }))
 }

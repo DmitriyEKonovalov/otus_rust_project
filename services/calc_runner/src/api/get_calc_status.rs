@@ -24,9 +24,10 @@ pub async fn get_calc_status(
     State(state): State<AppState>,
     Path(calc_id): Path<Uuid>,
 ) -> Result<Json<GetCalcStatusResponse>, ApiError> {
+
     let storage = state.storage; 
-    let key: String = format!("{}{}", CALC_INFO_PREFIX, calc_id);
-    let calc_info:CalcInfo = storage.get(&key).await.map_err(ApiError::from)?;
+
+    let calc_info:CalcInfo = storage.get(&CalcInfo::to_key(&calc_id)).await.map_err(ApiError::from)?;
     
     let duration: i64 = {
         if calc_info.end_dt.is_none() { 

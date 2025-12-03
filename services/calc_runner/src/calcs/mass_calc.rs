@@ -10,8 +10,6 @@ pub async fn mass_calc(
     calc_info: CalcInfo,
     storage: SharedStorage,
 ) -> Result<(), ApiError> {
-    // сохранить запись перед началом расчета в хранилище
-    storage.start_calc(&calc_info).await.map_err(ApiError::from)?;
 
     // расчет 
     let calc_params: MassCalcParams = serde_json::from_value(

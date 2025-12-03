@@ -1,10 +1,8 @@
 use axum::{extract::State, Json};
-use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use uuid::Uuid;
 use crate::app_state::AppState;
-use crate::models::CalcInfo;
 use crate::api::ApiError;
 use crate::calcs::spawn_calc;
 use crate::calcs::base_calc;
@@ -27,22 +25,16 @@ pub async fn run_base_calc(
     Json(params): Json<BaseCalcParams>,
 ) -> Result<Json<RunBaseCalcResponse>, ApiError> {
     
+    // проверка параметров 
     let calc_params: BaseCalcParams = params.clone();
     if calc_params.iterations == 0 {
         return Err(ApiError::BadParams("iterations must be > 0".into()));
     }
-    // создаем новый расчет
-    let calc_id = Uuid::new_v4();
-    let calc_info = CalcInfo {
-        calc_id: calc_id,
-        user_id: calc_params.user_id,
-        run_dt: Utc::now(),
-        end_dt: None,
-        params: Some(serde_json::to_value(&params).unwrap()),
-        progress: 0,
-        result: None,
-    };
 
+    // создаем новый расчет
+    let calc_info = state.storage.init_calc(params.user_id, serde_json::to_value(params).unwrap()).await?;
+    let calc_id = calc_info.calc_id;
+    
     // запустить отедльный поток с расчетом
     spawn_calc(base_calc, calc_info, state.storage);
 

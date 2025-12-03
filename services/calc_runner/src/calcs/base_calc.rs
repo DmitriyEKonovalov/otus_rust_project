@@ -11,9 +11,6 @@ pub async fn base_calc(
     storage: SharedStorage,
 ) -> Result<(), ApiError> {
 
-    // сохранить запись перед началом расчета в хранилище
-    storage.start_calc(&calc_info).await.map_err(ApiError::from)?;
-
     // расчет
     let calc_params: BaseCalcParams = serde_json::from_value(
         calc_info.params.clone().ok_or_else(|| ApiError::BadParams("Missing calculation parameters".into()))?

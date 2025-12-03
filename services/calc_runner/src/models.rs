@@ -2,12 +2,13 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use uuid::Uuid;
+use std::collections::HashSet;
 
-pub const CALC_INFO_PREFIX: &str = "calc_info:";
-pub const CALC_INFO_TTL_SECONDS: u64 = 24 * 3600;
+pub const CALC_INFO_PREFIX: &str = "CALC_INFO";
+pub const CALC_INFO_TTL_SECONDS: u64 = 1 * 3600;
 
-pub const USER_CALC_PREFIX: &str = "user_calc:";
-pub const USER_CALC_TTL_SECONDS: u64 = 24 * 3600;
+pub const USER_CALC_PREFIX: &str = "USER_CALCS";
+pub const USER_CALC_TTL_SECONDS: u64 = 1 * 3600;
 
 
 // Структура для информации о расчете
@@ -22,9 +23,33 @@ pub struct CalcInfo {
     pub result: Option<serde_json::Value>,
 }
 
+impl CalcInfo {
+    // возвращает ключ объекта в хранилище
+    pub fn key(&self) -> String {
+        format!("{}:{}", CALC_INFO_PREFIX, self.calc_id)
+    }
+
+    pub fn to_key(calc_id: &Uuid) -> String {
+        format!("{}:{}", CALC_INFO_PREFIX, calc_id)
+    }
+}
+
+
 // Структура для расчетов пользователя
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UserCalc {
+pub struct UserCalcs {
     pub user_id: i64,
-    pub calc_id: Uuid,
+    pub calcs: HashSet<Uuid>,
+}
+
+impl UserCalcs {
+    // возвращает ключ объекта в хранилище
+    pub fn key(&self) -> String {
+        format!("{}:{}", USER_CALC_PREFIX, self.user_id)
+    }
+    
+    pub fn to_key(user_id: &i64) -> String {
+        format!("{}:{}", USER_CALC_PREFIX, user_id)
+    }
+
 }
