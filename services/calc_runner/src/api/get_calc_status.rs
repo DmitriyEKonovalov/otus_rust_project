@@ -7,7 +7,7 @@ use serde::Serialize;
 use uuid::Uuid;
 use crate::app_state::AppState;
 use crate::api::ApiError;
-use crate::models::{CalcInfo, CALC_INFO_PREFIX};
+use crate::models::CalcInfo;
 
 #[derive(Debug, Serialize)]
 pub struct GetCalcStatusResponse {

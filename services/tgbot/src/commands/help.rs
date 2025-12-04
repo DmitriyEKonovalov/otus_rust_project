@@ -1,21 +1,37 @@
-// use std::sync::Arc;
-// use teloxide::{prelude::*, types::Message};
+use std::sync::Arc;
+use teloxide::{prelude::*, types::Message};
+use crate::settings::BotState;
+
+const HELP_MESSAGE_GUEST: &str = {
+    "Добро пожаловать!
+    Этот бот умеет запускать расчеты. 
+    Доступные команды:
+    - /help справка по командам.
+    - /base_calc - запуск базового расчета.
+    - /mass_calc - запуск массового расчета.
+    - /users_calc - просмотр статистки по активным расчетам пользователей.
+"};
+
+const HELP_MESSAGE_ADMIN: &str = {
+    "Добро пожаловать!
+    Этот бот умеет запускать расчеты. 
+    Доступные команды:
+    - /help справка по командам.
+    - /run_base_calc - запуск базового расчета.
+    - /run_mass_calc - запуск массового расчета.
+    - /get_users_calc - просмотр статистки по активным расчетам пользователей.
+    - /get_active_calcs - (АДМИН) получение всех акьтивных расчетов и по всем пользователям 
+"};
 
 
-// use crate::{
-// pub fn commands_help(user: &User) -> String {
-//     let mut commands = vec![START_DESC.to_string(), HELP_DESC.to_string()];
-//     if user.user_groups.is_granted(Role::Business) {
-//         commands.push(CALC_DESC.to_string());
-//     }
-//     if user.user_groups.is_granted(Role::Admin) {
-//         commands.push(USERS_CALC_DESC.to_string());
-//     }
+pub async fn help(
+    bot: Bot,
+    msg: Message,
+    user: User,
+    dialogue: BotDialogue,
+    _state: Arc<BotState>,
+) -> HandlerResult {
+    // если guest - показать  HELP_MESSAGE_GUEST
+    // если админ - показать HELP_MESSAGE_ADMIN
+}
 
-//     format!(
-//         GREETING_TEMPLATE,
-//         user.user_name,
-//         user.user_groups,
-//         commands.join("\n")
-//     )
-// }

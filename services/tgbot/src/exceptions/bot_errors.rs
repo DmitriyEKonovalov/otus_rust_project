@@ -4,8 +4,6 @@ use thiserror::Error;
 pub enum BotError {
     #[error("Telegram error: {0}")]
     Telegram(#[from] teloxide::RequestError),
-    #[error("Redis error: {0}")]
-    Redis(#[from] redis::RedisError),
     #[error("HTTP error: {0}")]
     Http(#[from] reqwest::Error),
     #[error("Parse error: {0}")]
