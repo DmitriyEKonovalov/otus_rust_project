@@ -2039,6 +2039,7 @@ dependencies = [
 name = "tgbot"
 version = "0.1.0"
 dependencies = [
+ "calc_runner",
  "chrono",
  "deadpool-redis",
  "dotenvy",

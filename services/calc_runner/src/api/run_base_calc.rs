@@ -13,7 +13,7 @@ pub struct BaseCalcParams {
     pub iterations: u32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RunBaseCalcResponse {
     pub calc_id: Uuid,
 }

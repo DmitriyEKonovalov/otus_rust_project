@@ -2,23 +2,40 @@ use std::sync::Arc;
 
 use teloxide::{prelude::*, types::Message};
 
+use crate::{
+    exceptions::HandlerResult,
+    models::calc_runner,
+    settings::BotState,
+};
 
-const NO_USERS_CALCS_MESSAGE: &str = "Нет запущенных расчетов у пользователей";
-const USERS_CALCS_HEADER: &str = "Активные расчеты:\n";
+const NO_USERS_CALCS_MESSAGE: &str = "Нет активный расчетов.";
+const USERS_CALCS_HEADER: &str = "Список активных расчетов:\n";
 
+pub async fn get_user_calcs(bot: Bot, state: Arc<BotState>, msg: Message) -> HandlerResult {
+    let user = match msg.from() {
+        Some(u) => u.clone(),
+        None => {
+            bot.send_message(msg.chat.id, NO_USERS_CALCS_MESSAGE).await?;
+            return Ok(());
+        }
+    };
 
-pub async fn get_user_calcs(
-    bot: Bot,
-    state: Arc<BotState>,
-    dialogue: BotDialogue,
-    msg: Message,
-) -> HandlerResult {
-    
-    // получает команду
-    // извлекает пользователя 
-    // отправляет http запрос в сервис calc_runner на на url get_users_calcs
-    // получает ответ
-    // отправляет сообщение пользователю с этой инфой и прикрепляет кнопки для статуса расчета
-    // если прогресс 100, дать markup  кнопку для получения результата 
+    let response =
+        calc_runner::get_user_calcs(&state.http_client, &state.config, user.id.0 as i64).await?;
+
+    if response.calcs.is_empty() {
+        bot.send_message(msg.chat.id, NO_USERS_CALCS_MESSAGE).await?;
+    } else {
+        let mut lines = Vec::new();
+        for calc_id in response.calcs.iter() {
+            lines.push(format!("- {}", calc_id));
+        }
+        bot.send_message(
+            msg.chat.id,
+            format!("{}{}", USERS_CALCS_HEADER, lines.join("\n")),
+        )
+        .await?;
+    }
+
+    Ok(())
 }
-

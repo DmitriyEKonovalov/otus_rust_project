@@ -2,14 +2,14 @@ use axum::{
     extract::{State},
     Json,
 };
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 use crate::app_state::AppState;
 use crate::api::ApiError;
 use crate::models::CalcInfo;
 use crate::models::CALC_INFO_PREFIX;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ShortCalcInfo {
     pub calc_id: Uuid,
     pub user_id: i64,
@@ -18,7 +18,7 @@ pub struct ShortCalcInfo {
     pub progress: u32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GetActiveCalcsResponse {
     pub calcs: Vec<ShortCalcInfo>,
 }

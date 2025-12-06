@@ -3,13 +3,13 @@ use axum::{
     Json,
 };
 use chrono::Utc;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 use crate::app_state::AppState;
 use crate::api::ApiError;
 use crate::models::CalcInfo;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GetCalcStatusResponse {
     pub calc_id: Uuid,
     pub user_id: i64,

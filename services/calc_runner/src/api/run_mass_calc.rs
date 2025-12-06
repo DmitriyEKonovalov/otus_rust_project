@@ -15,7 +15,7 @@ pub struct MassCalcParams {
     pub iterations: u32,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RunMassCalcResponse {
     pub calc_id: Uuid,
 }

@@ -2,14 +2,14 @@ use axum::{
     extract::{Path, State},
     Json,
 };
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 use std::collections::HashSet;
 use crate::app_state::AppState;
 use crate::api::ApiError;
 use crate::models::UserCalcs;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GetUserCalcsResponse {
     pub user_id: i64,
     pub calcs: HashSet<Uuid>,
