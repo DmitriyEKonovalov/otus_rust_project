@@ -1,6 +1,7 @@
 use axum::{http::StatusCode, response::IntoResponse, Json};
 use serde::Serialize;
 use crate::storage::StorageErrors;
+use tracing::error;
 
 // структура для сообщения об ошибке
 #[derive(Debug, Serialize)]
@@ -25,6 +26,7 @@ pub enum ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
+        error!(error = %self, "API error occurred");
         let status = match self {
             ApiError::BadParams(_) => StatusCode::BAD_REQUEST,
             ApiError::Json(_) => StatusCode::BAD_REQUEST,

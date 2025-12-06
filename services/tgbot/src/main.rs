@@ -9,6 +9,7 @@ use std::{env, sync::Arc};
 
 use dotenvy::dotenv;
 use teloxide::{dispatching::UpdateFilterExt, dptree, prelude::*, utils::command::BotCommands};
+use tracing_subscriber::EnvFilter;
 
 use crate::{
     commands::{dispatch_command, Command},
@@ -21,6 +22,10 @@ async fn main() -> Result<(), BotError> {
     dotenv().ok();
     // allow running from workspace root or crate dir
     let _ = dotenvy::from_filename("services/tgbot/.env");
+
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env().add_directive("info".parse().unwrap()))
+        .init();
 
     let bot_token = env::var("BOT_ID")
         .or_else(|_| env::var("TELEGRAM_BOT_TOKEN"))

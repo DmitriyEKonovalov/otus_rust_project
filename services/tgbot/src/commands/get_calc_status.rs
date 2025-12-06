@@ -9,6 +9,7 @@ use crate::{
     models::calc_runner,
     settings::BotState,
 };
+use tracing::info;
 
 const NOT_FOUND_MESSAGE: &str = "Calculation not found.";
 const GENERIC_ERROR_MESSAGE: &str = "Failed to fetch status. Please try again later.";
@@ -19,6 +20,12 @@ pub async fn get_calc_status(
     calc_id: Uuid,
     state: Arc<BotState>,
 ) -> HandlerResult {
+    info!(
+        user_id = msg.from().map(|u| u.id.0),
+        chat_id = msg.chat.id.0,
+        %calc_id,
+        "command get_calc_status invoked"
+    );
     match calc_runner::get_calc_status(&state.http_client, &state.config, calc_id).await {
         Ok(status) => {
             let text = format!(

@@ -7,6 +7,7 @@ use crate::{
     models::calc_runner,
     settings::BotState,
 };
+use tracing::info;
 
 const NO_USERS_CALCS_MESSAGE: &str = "Нет активный расчетов.";
 const USERS_CALCS_HEADER: &str = "Список активных расчетов:\n";
@@ -19,6 +20,11 @@ pub async fn get_user_calcs(bot: Bot, state: Arc<BotState>, msg: Message) -> Han
             return Ok(());
         }
     };
+    info!(
+        user_id = user.id.0,
+        chat_id = msg.chat.id.0,
+        "command get_user_calcs invoked"
+    );
 
     let response =
         calc_runner::get_user_calcs(&state.http_client, &state.config, user.id.0 as i64).await?;

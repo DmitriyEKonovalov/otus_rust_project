@@ -8,6 +8,7 @@ use std::collections::HashSet;
 use crate::app_state::AppState;
 use crate::api::ApiError;
 use crate::models::UserCalcs;
+use tracing::info;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GetUserCalcsResponse {
@@ -21,6 +22,7 @@ pub async fn get_user_calcs(
     State(state): State<AppState>,
     Path(user_id): Path<i64>,
 ) -> Result<Json<GetUserCalcsResponse>, ApiError> {
+    info!(user_id, "get_user_calcs endpoint called");
     let storage = state.storage; 
 
     let user_calcs: UserCalcs = storage.get(&UserCalcs::to_key(&user_id)).await.map_err(ApiError::from)?;

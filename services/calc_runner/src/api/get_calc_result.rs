@@ -7,6 +7,7 @@ use uuid::Uuid;
 use crate::app_state::AppState;
 use crate::api::ApiError;
 use crate::models::CalcInfo;
+use tracing::info;
 
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -27,6 +28,8 @@ pub async fn get_calc_result(
     State(state): State<AppState>,
     Path(calc_id): Path<Uuid>,
 ) -> Result<Json<GetCalcResultResponse>, ApiError> {
+    
+    info!(calc_id = %calc_id, "get_calc_result endpoint called");
     
     let storage = state.storage; 
     let calc_info:CalcInfo = storage.get(&CalcInfo::to_key(&calc_id)).await.map_err(ApiError::from)?;

@@ -6,6 +6,7 @@ use teloxide::{
     utils::command::BotCommands,
 };
 use uuid::Uuid;
+use tracing::info;
 
 use crate::{exceptions::HandlerResult, settings::BotState};
 
@@ -18,7 +19,7 @@ pub mod run_base_calc;
 pub mod run_mass_calc;
 pub mod start;
 
-#[derive(BotCommands, Clone)]
+#[derive(BotCommands, Clone, Debug)]
 #[command(rename_rule = "snake_case", description = "Available commands")]
 pub enum Command {
     #[command(description = "Start the bot")]
@@ -50,6 +51,13 @@ pub async fn dispatch_command(
     state: Arc<BotState>,
     command: Command,
 ) -> HandlerResult {
+    let user = msg.from();
+    info!(
+        command = %format!("{:?}", command),
+        user_id = user.map(|u| u.id.0),
+        chat_id = msg.chat.id.0,
+        "received command"
+    );
     match command {
         Command::Start => start::start(bot, msg, state).await,
         Command::Help => help::help(bot, msg, state).await,

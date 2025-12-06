@@ -6,6 +6,7 @@ use crate::app_state::AppState;
 use crate::api::ApiError;
 use crate::calcs::spawn_calc;
 use crate::calcs::mass_calc;
+use tracing::info;
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,6 +26,12 @@ pub async fn run_mass_calc(
     State(state): State<AppState>,
     Json(params): Json<MassCalcParams>,
 ) -> Result<Json<RunMassCalcResponse>, ApiError> {
+    info!(
+        user_id = params.user_id,
+        iterations = params.iterations,
+        data_len = params.data.len(),
+        "run_mass_calc endpoint called"
+    );
 
     // проверка параметров 
     let calc_params: MassCalcParams = params.clone();
@@ -35,6 +42,12 @@ pub async fn run_mass_calc(
     // создаем новый расчет
     let calc_info = state.storage.init_calc(params.user_id, serde_json::to_value(params).unwrap()).await?;
     let calc_id = calc_info.calc_id;
+    info!(
+        calc_id = %calc_id,
+        user_id = calc_info.user_id,
+        run_dt = %calc_info.run_dt,
+        "mass calculation scheduled"
+    );
     
     // запустить отедльный поток с расчетом
     spawn_calc(mass_calc, calc_info, state.storage);

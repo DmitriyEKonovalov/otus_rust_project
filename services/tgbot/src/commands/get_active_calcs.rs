@@ -9,6 +9,7 @@ use crate::{
     permissions::get_user_role,
     settings::BotState,
 };
+use tracing::info;
 
 const NO_ACTIVE_CALCS_MESSAGE: &str = "Нет активный расчетов.";
 const ACTIVE_CALCS_HEADER: &str = "Список активных расчетов:\n";
@@ -22,6 +23,11 @@ pub async fn get_active_calcs(bot: Bot, state: Arc<BotState>, msg: Message) -> H
             return Ok(());
         }
     };
+    info!(
+        user_id = user.id.0,
+        chat_id = msg.chat.id.0,
+        "command get_active_calcs invoked"
+    );
 
     let role = get_user_role(&user, &state.config.admin_user_ids);
     if !role.is_granted(Role::Admin) {

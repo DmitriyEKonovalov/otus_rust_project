@@ -8,6 +8,7 @@ use crate::app_state::AppState;
 use crate::api::ApiError;
 use crate::models::CalcInfo;
 use crate::models::CALC_INFO_PREFIX;
+use tracing::info;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ShortCalcInfo {
@@ -28,6 +29,7 @@ pub struct GetActiveCalcsResponse {
 pub async fn get_active_calcs(
     State(state): State<AppState>,
 ) -> Result<Json<GetActiveCalcsResponse>, ApiError> {
+    info!("get_active_calcs endpoint called");
     let storage = state.storage; 
 
     let all_calcs: Option<Vec<CalcInfo>> = storage.get_all(&format!("{}:*", CALC_INFO_PREFIX)).await.map_err(ApiError::from)?;

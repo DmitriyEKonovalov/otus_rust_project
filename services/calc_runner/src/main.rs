@@ -12,6 +12,7 @@ use axum::{
 };
 use tokio::net::TcpListener;
 use deadpool_redis::{Config as RedisConfig, Runtime};
+use tracing_subscriber::EnvFilter;
 
 use crate::api::{
     run_base_calc, 
@@ -24,6 +25,10 @@ use crate::api::{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env().add_directive("info".parse()?))
+        .init();
+
     let redis_cfg = RedisConfig::from_url("redis://127.0.0.1/");
     let pool = redis_cfg.create_pool(Some(Runtime::Tokio1))?;
 
@@ -45,7 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_state(app_state);
 
     let listener = TcpListener::bind("0.0.0.0:3000").await?;
-    println!("...Server running on http://{}", listener.local_addr()?);
+    tracing::info!("Server running on http://{}", listener.local_addr()?);
     axum::serve(listener, app).await?;
 
     Ok(())
