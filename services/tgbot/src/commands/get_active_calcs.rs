@@ -15,6 +15,7 @@ const NO_ACTIVE_CALCS_MESSAGE: &str = "Нет активный расчетов.
 const ACTIVE_CALCS_HEADER: &str = "Список активных расчетов:\n";
 const ADMIN_ONLY_MESSAGE: &str = "Не достаточно прав на команду";
 
+// получение активных расчетов по всем пользователям (только для админов)
 pub async fn get_active_calcs(bot: Bot, state: Arc<BotState>, msg: Message) -> HandlerResult {
     let user = match msg.from() {
         Some(u) => u.clone(),

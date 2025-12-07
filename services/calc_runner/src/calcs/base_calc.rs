@@ -18,7 +18,7 @@ pub async fn base_calc(
     let mut simulations = Vec::with_capacity(calc_params.iterations as usize);
     for i in 0..calc_params.iterations {
         sleep(Duration::from_secs(10)).await;
-        let value = Utc::now().timestamp_millis(); // extract millis from now() like random value
+        let value = Utc::now().timestamp_millis(); // извлекаеит millis from now() типа случайное значение
         simulations.push(value);
 
 

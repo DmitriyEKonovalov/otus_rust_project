@@ -11,8 +11,8 @@ use crate::{
 };
 use tracing::info;
 
-const NOT_FOUND_MESSAGE: &str = "Calculation not found.";
-const GENERIC_ERROR_MESSAGE: &str = "Failed to fetch status. Please try again later.";
+const NOT_FOUND_MESSAGE: &str = "Расчет не найден.";
+const OTHER_ERROR_MESSAGE: &str = "Не удалось получить статус. Попробуйте позже.";
 
 pub async fn get_calc_status(
     bot: Bot,
@@ -29,7 +29,7 @@ pub async fn get_calc_status(
     match calc_runner::get_calc_status(&state.http_client, &state.config, calc_id).await {
         Ok(status) => {
             let text = format!(
-                "Calc {} status:\nProgress: {}%\nDuration: {}s\nStarted: {}",
+                "Расчет {} статус:\nПрогресс: {}%\nДлительность: {}s\nНачат: {}",
                 status.calc_id,
                 status.progress,
                 status.duration,
@@ -42,12 +42,12 @@ pub async fn get_calc_status(
             if let Some(StatusCode::NOT_FOUND) = err.status() {
                 bot.send_message(msg.chat.id, NOT_FOUND_MESSAGE).await?;
             } else {
-                bot.send_message(msg.chat.id, GENERIC_ERROR_MESSAGE).await?;
+                bot.send_message(msg.chat.id, OTHER_ERROR_MESSAGE).await?;
             }
             Ok(())
         }
         Err(_) => {
-            bot.send_message(msg.chat.id, GENERIC_ERROR_MESSAGE).await?;
+            bot.send_message(msg.chat.id, OTHER_ERROR_MESSAGE).await?;
             Ok(())
         }
     }

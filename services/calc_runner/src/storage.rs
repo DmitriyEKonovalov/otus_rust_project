@@ -18,12 +18,13 @@ pub enum StorageErrors {
     Json(String), 
     NotFound(String),
 }
-
+// хранилище объектов на базе redis
 #[derive(Debug)]
 pub struct Storage { pool: Pool }
 
 pub type SharedStorage = Arc<Storage>;
 
+// функции обертки над интерфейсом redis, для более абстрактного взаимодействия с хранилищем
 impl Storage {
     pub fn new(pool: Pool) -> Self { Self { pool } }
 

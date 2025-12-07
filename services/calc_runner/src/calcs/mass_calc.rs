@@ -20,7 +20,7 @@ pub async fn mass_calc(
         let mut series = Vec::with_capacity(calc_params.iterations as usize);
         for _ in 0..calc_params.iterations {
             sleep(Duration::from_secs(5)).await;
-            let value = Utc::now().timestamp_millis() * n as i64; // extract millis from now() like random value
+            let value = Utc::now().timestamp_millis() * n as i64; // извлекаеит millis from now() типа случайное значение
             series.push(value);
         }
         simulations.insert(i, series);

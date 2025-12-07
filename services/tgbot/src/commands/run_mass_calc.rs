@@ -11,8 +11,8 @@ use crate::models::calc_runner::{self, MassCalcParams};
 use crate::settings::{BotState, LIMIT_EXCEEDED_MESSAGE, MAX_CALC_FOR_USER};
 
 const INVALID_DATA_MESSAGE: &str =
-    "Provide numbers separated by commas after iterations, e.g. /mass_calc 3 1,2,3.";
-const STARTED_MESSAGE: &str = "Started mass calculation.";
+    "Передайте числа через запятую после количества итераций, пример: /mass_calc 3 1,2,3.";
+const STARTED_MESSAGE: &str = "Запущен массовый расчет.";
 
 pub async fn run_mass_calc_command(
     bot: Bot,
@@ -22,7 +22,7 @@ pub async fn run_mass_calc_command(
     state: Arc<BotState>,
 ) -> HandlerResult {
     if iterations == 0 {
-        bot.send_message(msg.chat.id, "Iterations must be greater than zero.")
+        bot.send_message(msg.chat.id, "Число итераций должно быть больше нуля.")
             .await?;
         return Ok(());
     }
@@ -30,7 +30,7 @@ pub async fn run_mass_calc_command(
     let user = match msg.from() {
         Some(u) => u.clone(),
         None => {
-            bot.send_message(msg.chat.id, "Cannot identify user.").await?;
+            bot.send_message(msg.chat.id, "Не удалось определить пользователя.").await?;
             return Ok(());
         }
     };
@@ -66,7 +66,7 @@ pub async fn run_mass_calc_command(
     bot.send_message(
         msg.chat.id,
         format!(
-            "{} ID: {} (iterations: {}, data size: {})",
+            "{} ID: {} (итераций: {}, размер данных: {})",
             STARTED_MESSAGE,
             calc_id,
             iterations,
@@ -97,7 +97,7 @@ fn parse_numbers(raw: &str) -> Option<Vec<u32>> {
 
 fn calc_actions_keyboard(calc_id: Uuid) -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new(vec![vec![
-        InlineKeyboardButton::callback("Status", format!("calc_status:{calc_id}")),
-        InlineKeyboardButton::callback("Result", format!("calc_result:{calc_id}")),
+        InlineKeyboardButton::callback("Статус", format!("calc_status:{calc_id}")),
+        InlineKeyboardButton::callback("Результат", format!("calc_result:{calc_id}")),
     ]])
 }
