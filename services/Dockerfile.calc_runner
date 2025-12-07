@@ -1,31 +1,26 @@
-# Builder
 FROM rust:1.83-slim AS builder
 
 WORKDIR /app
 
-# Кэшируем зависимости
+RUN apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
+
+# Pre-cache dependencies
 COPY Cargo.toml Cargo.lock ./
-COPY common/Cargo.toml crates/common/
-COPY services/calc-runner/Cargo.toml services/calc-runner/
-
-# Создаём dummy-файлы для кэширования
-RUN mkdir -p common/src services/calc-runner/src && \
-    touch common/src/lib.rs services/calc-runner/src/main.rs
-
-# Собираем зависимости
+COPY services/calc_runner/Cargo.toml services/calc_runner/Cargo.toml
+COPY services/tgbot/Cargo.toml services/tgbot/Cargo.toml
+RUN mkdir -p services/calc_runner/src services/tgbot/src && \
+    printf 'fn main() {}' > services/calc_runner/src/main.rs && \
+    printf 'fn main() {}' > services/tgbot/src/main.rs
 RUN cargo build --release --workspace
 
-# Копируем исходники и собираем
+# Build application
 COPY . .
-RUN cargo build --release -p calc-runner
-# RUN cargo build --release -p calc-worker  # если нужен
+RUN cargo build --release -p calc_runner
 
-# Runtime
 FROM debian:bookworm-slim
 
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /app/target/release/calc-web /usr/local/bin/
-# COPY --from=builder /app/target/release/calc-worker /usr/local/bin/
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl libssl3 && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /app/target/release/calc_runner /usr/local/bin/
 
 EXPOSE 3000
-CMD ["calc-runner"]
+CMD ["calc_runner"]
