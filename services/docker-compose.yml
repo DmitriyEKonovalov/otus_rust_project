@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: redis_storage
+    command: ["sh", "-c", "if [ -n \"$${REDIS_PASSWORD}\" ]; then exec redis-server --requirepass \"$${REDIS_PASSWORD}\"; else exec redis-server; fi"]
+    env_file:
+      - .env
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -n \"$${REDIS_PASSWORD}\" ]; then redis-cli -a \"$${REDIS_PASSWORD}\" ping; else redis-cli ping; fi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  calc_runner:
+    build:
+      context: ..
+      dockerfile: services/Dockerfile.calc_runner
+    container_name: calc_runner
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=${REDIS_URL:-}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - APP_HOST=0.0.0.0
+      - CALC_RUNNER_PORT=${CALC_RUNNER_PORT:-3000}
+    ports:
+      - "${CALC_RUNNER_PORT:-3000}:${CALC_RUNNER_PORT:-3000}"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${CALC_RUNNER_PORT:-3000}/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  tgbot:
+    build:
+      context: ..
+      dockerfile: services/Dockerfile.tgbot
+    container_name: tgbot
+    env_file:
+      - .env
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-${BOT_ID}}
+      - BOT_ID=${BOT_ID}
+      - CALC_RUNNER_BASE_URL=${CALC_RUNNER_BASE_URL}
+      - ADMIN_USER_IDS=${ADMIN_USER_IDS}
+      - MAX_ACTIVE_CALCS=${MAX_ACTIVE_CALCS:-10}
+      - TELOXIDE_PROXY=${TELOXIDE_PROXY:-}
+      - HTTPS_PROXY=${HTTPS_PROXY:-}
+      - HTTP_PROXY=${HTTP_PROXY:-}
+      - ALL_PROXY=${ALL_PROXY:-}
+    depends_on:
+      calc_runner:
+        condition: service_healthy
+
+volumes:
+  redis_data:
