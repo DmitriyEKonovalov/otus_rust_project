@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = [
+    "services/calc_runner",
+    "services/tgbot",
+]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
